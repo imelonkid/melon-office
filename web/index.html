@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Melon Office · 甜瓜科技 AI 事业部</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 34 34'%3E%3Ccircle cx='17' cy='19' r='13' fill='%237CC46F'/%3E%3Cpath d='M17 6v26' stroke='%233F7F3A' stroke-width='2'/%3E%3C/svg%3E">
+</head>
+<body>
+  <div id="app">
+    <header id="top">
+      <div class="brand">
+        <svg width="34" height="34" viewBox="0 0 34 34" aria-hidden="true">
+          <circle cx="17" cy="19" r="13" fill="#7CC46F"></circle>
+          <path d="M10 9 Q8 19 10 30 M17 6 L17 32 M24 9 Q26 19 24 30" stroke="#3F7F3A" stroke-width="2" fill="none"></path>
+          <rect x="15.5" y="2" width="3" height="5" rx="1.5" fill="#7A4E2D"></rect>
+        </svg>
+        <div>
+          <div class="brand-name">甜瓜科技 · AI 事业部</div>
+          <div class="brand-sub">B3 工区 · Claude Code 实时</div>
+        </div>
+      </div>
+      <div class="chips">
+        <div class="chip" id="live"><i></i><span id="live-text">连接中</span></div>
+        <div class="chip">在岗 <b id="headcount">0 / 0</b></div>
+        <div class="chip">今日交付 <b id="delivered">0</b></div>
+        <div class="chip taxi" id="taxi">距打车报销 --:--</div>
+      </div>
+    </header>
+    <main>
+      <section id="stage-wrap">
+        <div id="stage"></div>
+        <div id="caption"></div>
+      </section>
+      <aside id="panel"></aside>
+    </main>
+  </div>
+  <script type="module" src="./src/main.ts"></script>
+</body>
+</html>

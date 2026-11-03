@@ -1,0 +1,37 @@
+{
+  "name": "melon-office",
+  "version": "0.1.0",
+  "description": "把你的 Claude Code 会话变成一层大厂工区：每个 AI 是一个员工，干活、举手要审批、去茶水间摸鱼。",
+  "type": "module",
+  "license": "MIT",
+  "author": "melonkid",
+  "bin": {
+    "melon-office": "bin/melon-office.mjs"
+  },
+  "files": [
+    "bin",
+    "server",
+    "dist",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "dev": "node bin/melon-office.mjs start --no-open & vite",
+    "dev:demo": "node bin/melon-office.mjs demo --no-open & vite",
+    "build": "vite build",
+    "start": "node bin/melon-office.mjs start",
+    "demo": "node bin/melon-office.mjs demo",
+    "typecheck": "tsc --noEmit",
+    "assets": "python3 tools/render_assets.py"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "phaser": "^3.88.2",
+    "typescript": "^5.6.3",
+    "vite": "^5.4.11"
+  }
+}
