@@ -11,13 +11,26 @@ export const CAST = [
   { key: 'pi', name: '小皮', role: '调研', level: 'P5' },
 ];
 export const SEAT_COUNT = 6;
+// sprites for people who only come in for one job (外包 / 实习生)
+const GUESTS = ['g1', 'g2', 'g3', 'g4'];
+const CHAT_PAIRS = 2; // spots in the pantry where two people can gossip
+
+// what people do when there is nothing to do
+const SLACK = {
+  phone: ['刷到个好笑的视频', '看看基金，又绿了', '外卖还有 8 分钟到', '在群里抢红包', '刷一会儿小红书'],
+  cat: ['猫主子今天不理我', '行政猫是不是又胖了', '撸猫解压，比开会管用', '咪咪，来给你挠挠'],
+  coffee: ['带薪喝咖啡', '续杯，续命', '今天的零食又被抢光了', '茶水间补充一下能量'],
+};
+const GOSSIP = [
+  ['听说隔壁组又要拆了', '真的假的，我们会被合并吗'],
+  ['今年年终奖几个月？', '别问，问就是共克时艰'],
+  ['你周报写了吗', '写了，全靠「持续推进」'],
+  ['中午吃啥？', '楼下那家又涨价了'],
+  ['老板说的抓手到底是啥', '不知道，先对齐一下'],
+];
 
 const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
-const clip = (s, n = 48) => {
-  if (!s) return '';
-  const one = String(s).replace(/\s+/g, ' ').trim();
-  return one.length > n ? one.slice(0, n - 1) + '…' : one;
-};
+const pad2 = (n) => String(n).padStart(2, '0');
 
 export function classify(tool = '') {
   if (/^(Edit|Write|MultiEdit|NotebookEdit)$/.test(tool)) return 'edit';
@@ -34,14 +47,20 @@ export function classify(tool = '') {
 export { humanize, shortCommand } from './translate.mjs';
 
 export class Office extends EventEmitter {
-  constructor() {
+  // staff: how many employees are in the office even when no session is running
+  constructor({ staff = 3 } = {}) {
     super();
     this.agents = new Map();
+    this.links = new Map(); // session key (session_id, or session_id:agent_id) -> agent id
     this.pending = new Map();
     this.feed = [];
-    this.stats = { delivered: 0, toolCalls: 0, approvals: 0, prompts: 0, failures: 0, since: Date.now() };
+    this.stats = { delivered: 0, toolCalls: 0, approvals: 0, prompts: 0, failures: 0, slack: 0, since: Date.now() };
     this.approvals = { enabled: true, clients: 0 };
     this.seq = 0;
+    this.hired = { guest: 0, intern: 0, contractor: 0 };
+    const n = Math.max(0, Math.min(CAST.length, Math.floor(Number(staff) || 0)));
+    CAST.slice(0, n).forEach((c, i) => this.addResident(c, i));
+    setInterval(() => this.shuffleSlack(), 4000).unref();
   }
 
   // ---------- helpers ----------
@@ -58,45 +77,117 @@ export class Office extends EventEmitter {
     return null;
   }
 
-  freeCast() {
-    const used = new Set([...this.agents.values()].map((a) => a.cast));
-    const free = CAST.find((c) => !used.has(c.key));
-    if (free) return { ...free };
-    const base = CAST[this.agents.size % CAST.length];
-    return { ...base, name: `${base.name}${this.agents.size + 1}号` };
+  // someone new walking in: a cast member who isn't in the office yet, else a numbered 外包 / 实习生.
+  // Numbers only go up, so two people never share a name.
+  hire(isSub) {
+    if (!isSub) {
+      const present = new Set([...this.agents.values()].map((a) => a.cast));
+      const free = CAST.find((c) => !present.has(c.key));
+      if (free) return { ...free };
+    }
+    const cast = GUESTS[this.hired.guest++ % GUESTS.length];
+    return isSub
+      ? { key: cast, name: `实习${pad2(++this.hired.intern)}号`, role: '实习生', level: 'P4' }
+      : { key: cast, name: `外包${pad2(++this.hired.contractor)}号`, role: '外包', level: 'P5' };
+  }
+
+  blank(id, cast, patch) {
+    const now = Date.now();
+    return {
+      id, sessionId: null, isSub: false, resident: false, parentName: null,
+      cast: cast.key, name: cast.name, role: cast.role, level: cast.level,
+      project: '', seat: null, status: 'thinking', kind: 'think', tool: '', detail: '',
+      line: '', gist: '', raw: '', activity: null, partner: null, slackUntil: 0, slackSince: 0,
+      toolCalls: 0, startedAt: now, updatedAt: now, ...patch,
+    };
+  }
+
+  addResident(cast, seat) {
+    const a = this.blank(`staff:${cast.key}`, cast, { resident: true, seat });
+    this.agents.set(a.id, a);
+    this.startSlacking(a);
   }
 
   ensure(evt) {
     const sid = evt.session_id;
-    const id = evt.agent_id ? `${sid}:${evt.agent_id}` : sid;
-    let a = this.agents.get(id);
-    if (!a) {
-      const cast = this.freeCast();
-      const parent = evt.agent_id ? this.agents.get(sid) : null;
-      a = {
-        id,
-        sessionId: sid,
-        isSub: Boolean(evt.agent_id),
-        parentName: parent?.name || null,
-        cast: cast.key,
-        name: cast.name,
-        role: evt.agent_id ? '实习生' : cast.role,
-        level: evt.agent_id ? 'P4' : cast.level,
-        project: evt.cwd ? path.basename(evt.cwd) : '',
-        seat: this.freeSeat(),
-        status: 'thinking',
-        kind: 'think',
-        tool: '',
-        detail: '',
-        line: evt.agent_id ? `实习生报到，跟着${parent?.name || '组长'}干` : '新同学入职，先熟悉一下项目',
-        toolCalls: 0,
-        startedAt: Date.now(),
-        updatedAt: Date.now(),
-      };
-      this.agents.set(id, a);
-      this.log(a, a.line);
+    const key = evt.agent_id ? `${sid}:${evt.agent_id}` : sid;
+    const known = this.agents.get(this.links.get(key));
+    if (known) return known;
+
+    const project = evt.cwd ? path.basename(evt.cwd) : '';
+    // a resident with nothing to do takes the job; subagents are always fresh interns
+    let a = evt.agent_id ? null : [...this.agents.values()].find((x) => x.resident && x.status === 'slacking');
+    if (a) {
+      this.stopSlacking(a);
+      this.set(a, { sessionId: sid, project, status: 'thinking', kind: 'think', tool: '', detail: '', toolCalls: 0, startedAt: Date.now(), line: '来活了，放下手机' });
+    } else {
+      const parent = evt.agent_id ? this.agents.get(this.links.get(sid)) : null;
+      const cast = this.hire(Boolean(evt.agent_id));
+      const line = evt.agent_id ? `实习生报到，跟着${parent?.name || '组长'}干` : '新同学入职，先熟悉一下项目';
+      a = this.blank(key, cast, {
+        sessionId: sid, isSub: Boolean(evt.agent_id), parentName: parent?.name || null,
+        project, seat: this.freeSeat(), line, gist: line,
+      });
+      this.agents.set(a.id, a);
     }
+    this.links.set(key, a.id);
+    this.log(a, a.line);
     return a;
+  }
+
+  unlink(a) {
+    for (const [k, id] of this.links) if (id === a.id) this.links.delete(k);
+  }
+
+  // ---------- 摸鱼 ----------
+  startSlacking(a, line) {
+    this.clearPending(a);
+    this.unlink(a);
+    this.set(a, { sessionId: null, project: '', status: 'slacking', kind: 'idle', tool: '', detail: '', toolCalls: 0, startedAt: Date.now(), slackSince: Date.now() });
+    this.pickActivity(a);
+    if (line) this.set(a, { line });
+  }
+
+  stopSlacking(a) {
+    if (a.status === 'slacking') this.stats.slack += Date.now() - a.slackSince;
+    const mate = a.partner && this.agents.get(a.partner);
+    this.set(a, { status: 'thinking', activity: null, partner: null, slackUntil: 0 });
+    if (mate && mate.partner === a.id) this.pickActivity(mate);
+  }
+
+  pickActivity(a) {
+    const now = Date.now();
+    const slackers = [...this.agents.values()].filter((x) => x.status === 'slacking');
+    const chats = slackers.filter((x) => x.activity === 'chat').length / 2;
+    const free = slackers.filter((x) => x !== a && !x.partner);
+    const mate = chats < CHAT_PAIRS && free.length && Math.random() < 0.5 ? pick(free) : null;
+    const until = now + 25000 + Math.random() * 25000;
+    if (mate) {
+      const [first, second] = pick(GOSSIP);
+      this.set(a, { activity: 'chat', partner: mate.id, slackUntil: until, line: first });
+      this.set(mate, { activity: 'chat', partner: a.id, slackUntil: until, line: second });
+      return;
+    }
+    const options = ['phone', 'phone', 'coffee'];
+    if (a.seat == null) options.splice(0, 2, 'coffee');
+    if (!slackers.some((x) => x !== a && x.activity === 'cat')) options.push('cat');
+    const activity = pick(options);
+    this.set(a, { activity, partner: null, slackUntil: until, line: pick(SLACK[activity]) });
+  }
+
+  shuffleSlack() {
+    const now = Date.now();
+    let moved = false;
+    for (const a of this.agents.values()) {
+      if (a.status !== 'slacking' || a.slackUntil > now) continue;
+      const mate = a.partner && this.agents.get(a.partner);
+      this.set(a, { activity: null, partner: null });
+      if (mate && mate.partner === a.id) this.set(mate, { activity: null, partner: null });
+      this.pickActivity(a);
+      if (mate && mate.status === 'slacking' && !mate.activity) this.pickActivity(mate);
+      moved = true;
+    }
+    if (moved) this.changed();
   }
 
   set(a, patch) {
@@ -112,6 +203,7 @@ export class Office extends EventEmitter {
     setTimeout(() => {
       a.status = 'gone';
       this.agents.delete(a.id);
+      this.unlink(a);
       this.changed();
     }, 9000);
   }
@@ -131,8 +223,15 @@ export class Office extends EventEmitter {
     if (!evt || !evt.session_id || !evt.hook_event_name) return;
     const ev = evt.hook_event_name;
     if (ev === 'SessionEnd') {
-      const subs = [...this.agents.values()].filter((x) => x.sessionId === evt.session_id);
-      subs.forEach((x) => this.leave(x, '下班打卡'));
+      const team = [...this.agents.values()].filter((x) => x.sessionId === evt.session_id && x.status !== 'leaving');
+      for (const x of team) {
+        if (x.resident) {
+          this.log(x, '活干完了，回去摸鱼');
+          this.startSlacking(x);
+        } else {
+          this.leave(x, x.isSub ? '活交了，实习生下班' : '下班打卡');
+        }
+      }
       this.changed();
       return;
     }
@@ -243,11 +342,18 @@ export class Office extends EventEmitter {
     return this.approvals.enabled && this.approvals.clients > 0;
   }
 
+  slackingNow() {
+    const now = Date.now();
+    let ms = 0;
+    for (const a of this.agents.values()) if (a.status === 'slacking') ms += now - a.slackSince;
+    return ms;
+  }
+
   snapshot() {
     return {
       agents: [...this.agents.values()],
       pending: [...this.pending.values()].map(({ id, agentId, tool, detail, gist, raw, holding }) => ({ id, agentId, tool, detail, gist, raw, holding })),
-      stats: this.stats,
+      stats: { ...this.stats, slack: this.stats.slack + this.slackingNow() },
       feed: this.feed.slice(0, 12),
       approvals: { enabled: this.approvals.enabled, active: this.canHold() },
       now: Date.now(),

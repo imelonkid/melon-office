@@ -1,7 +1,7 @@
 // The OA 工作台 on the right: approvals, who is working, who is slacking, and the auto daily report.
 import type { Agent, State } from './types';
 import { net } from './net';
-import { RECORD, askOf, dailyReport, lineOf, projectOf, rawOf, since } from './copy';
+import { ACTIVITY, RECORD, askOf, dailyReport, lineOf, projectOf, rawOf, since } from './copy';
 
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!));
 const KIND_CLASS: Record<string, string> = { edit: 'k-edit', read: 'k-read', search: 'k-read', bash: 'k-bash', web: 'k-web', fail: 'k-fail' };
@@ -16,7 +16,7 @@ function card(a: Agent, now: number, right: string, sub: string, cls = '') {
   return `<div class="card ${cls}">
     ${avatar(a)}
     <div class="card-body">
-      <div class="card-top"><b>${esc(a.isSub ? `${a.name}·实习` : a.name)}</b><span class="muted">${esc(right || since(a.startedAt, now))}</span></div>
+      <div class="card-top"><b>${esc(a.name)}</b><span class="muted">${esc(right || since(a.startedAt, now))}</span></div>
       <div class="card-line">${sub}</div>
       ${raw ? `<div class="card-sub ${KIND_CLASS[a.kind] || ''}">${esc(raw)}</div>` : ''}
       ${proj ? `<div class="card-proj">${esc(a.role)} · ${esc(proj)}</div>` : ''}
@@ -59,6 +59,7 @@ export function mountPanel(el: HTMLElement) {
     const waitingIds = new Set(waiting.map((x) => x.a.id));
     const busy = live.filter((a) => !waitingIds.has(a.id) && (a.status === 'working' || a.status === 'thinking' || a.status === 'waiting'));
     const chill = live.filter((a) => a.status === 'idle' || a.status === 'leaving');
+    const slacking = live.filter((a) => a.status === 'slacking');
 
     const html = `
       <div class="panel-head">
@@ -86,7 +87,10 @@ export function mountPanel(el: HTMLElement) {
       ${busy.map((a) => card(a, now, a.toolCalls ? `${a.toolCalls} 次调用` : '', esc(lineOf(a)))).join('') || '<div class="empty">工位空空，AI 们都在摸鱼</div>'}
 
       <div class="section">茶水间 · ${chill.length}</div>
-      ${chill.map((a) => card(a, now, a.status === 'leaving' ? '下班了' : '摸鱼中', esc(lineOf(a)), 'dim')).join('')}
+      ${chill.map((a) => card(a, now, a.status === 'leaving' ? '下班了' : '等验收', esc(lineOf(a)), 'dim')).join('')}
+
+      ${slacking.length ? `<div class="section">摸鱼中 · ${slacking.length}</div>` : ''}
+      ${slacking.map((a) => card(a, now, ACTIVITY[a.activity || ''] || '摸鱼中', esc(lineOf(a)), 'dim')).join('')}
 
       <div class="report">
         <div class="report-head"><b>瓜老板的日报</b><span class="muted">自动生成</span></div>

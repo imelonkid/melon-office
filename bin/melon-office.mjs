@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // melon-office CLI
-//   melon-office                     开工（= start）
+//   melon-office [--staff 3]         开工（= start）
 //   melon-office demo                演示模式（回放假数据，方便录视频）
 //   melon-office init [--project] [--port 7777] [--no-approvals]   写入 Claude Code hooks
 //   melon-office status | update | uninstall [--project]
@@ -19,6 +19,7 @@ const opt = (name, fallback) => {
   return i >= 0 && args[i + 1] ? args[i + 1] : fallback;
 };
 const port = Number(opt('port', process.env.MELON_OFFICE_PORT || 7777));
+const staff = Number(opt('staff', process.env.MELON_OFFICE_STAFF ?? 3));
 
 function openBrowser(url) {
   const opener = process.platform === 'darwin' ? 'open' : process.platform === 'win32' ? 'cmd' : 'xdg-open';
@@ -73,7 +74,7 @@ async function run() {
     case 'demo': {
       ensureBuilt();
       const { startServer } = await import('../server/index.mjs');
-      const { url } = await startServer({ port, demo: cmd === 'demo' });
+      const { url } = await startServer({ port, staff, demo: cmd === 'demo' });
       console.log(`\n  🍈 Melon Office 已开工 → ${url}`);
       if (cmd === 'start' && status().events.length === 0 && status({ project: true }).events.length === 0) {
         console.log('  提示：还没接入 Claude Code，另开一个终端运行 `melon-office init`');
@@ -95,7 +96,7 @@ async function run() {
     update      更新到最新版
     uninstall   移除 hooks
 
-  选项：--port 7777  --no-open
+  选项：--port 7777  --no-open  --staff 3（没活时也在工区摸鱼的员工数，0–5）
 `);
   }
 }

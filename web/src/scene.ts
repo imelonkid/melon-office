@@ -3,10 +3,11 @@ import type { Agent, Layout, Pending, State, XY } from './types';
 import { net } from './net';
 import { askOf, lineOf, rawOf } from './copy';
 
-const CAST_KEYS = ['boss', 'gua', 'tian', 'zi', 'agua', 'pi'];
+const CAST_KEYS = ['boss', 'gua', 'tian', 'zi', 'agua', 'pi', 'g1', 'g2', 'g3', 'g4'];
 const FONT = '"PingFang SC","Hiragino Sans GB","Noto Sans SC","Microsoft YaHei",sans-serif';
 const MONO = 'Menlo,"SF Mono",Consolas,monospace';
 const SPEED = 2.4; // floor units per second
+const CAT_LANE = 7.9; // open floor between the row-2 desks and the cot, the way to the cat
 
 // monitor-glow color per kind of work (pixtuoid-style), drawn as a halo around the seated employee
 const GLOW: Record<string, number> = {
@@ -16,6 +17,7 @@ const GLOW: Record<string, number> = {
 const CHIP: Record<string, [string, string]> = {
   gua: ['#DDF3D8', '#2F6B2A'], tian: ['#DDF0FB', '#22628C'], zi: ['#F1E2FA', '#6B3A8C'],
   agua: ['#FFE3C4', '#8A4B12'], pi: ['#ECEAF3', '#4A4560'], boss: ['#FFF0C7', '#7A5A10'],
+  g1: ['#D6F1EE', '#1F6A62'], g2: ['#FCE1EA', '#8C2F52'], g3: ['#FFF0C7', '#7A5A10'], g4: ['#E3E8F7', '#3A4A80'],
 };
 const BOSS_LINES = [
   '这个需求，我们拉通对齐一下', '今天的抓手是什么？', 'Q4 要打出组合拳', '大家辛苦了，再冲一下', '把颗粒度再细一点',
@@ -128,8 +130,9 @@ class Bubble extends Phaser.GameObjects.Container {
 }
 
 // ---------------------------------------------------------------- one employee
-type Place = 'seat' | 'pantry' | 'walk';
-type Target = 'seat' | 'pantry' | 'exit';
+type Spot = 'seat' | 'pantry' | 'chat' | 'cat';
+type Place = Spot | 'walk';
+type Target = Spot | 'exit';
 
 class Worker {
   sprite: Phaser.GameObjects.Sprite;
@@ -144,6 +147,7 @@ class Worker {
   phase = Math.random() * 6;
   lastSx = 0;
   removed = false;
+  chatSlot = 0; // 0 = the left one of a gossip pair, faces right
 
   // instant: the employee was already in the office when the page opened, so skip the walk-in
   constructor(private scene: OfficeScene, public agent: Agent, instant = false) {
@@ -173,6 +177,7 @@ class Worker {
     const prev = this.agent;
     this.agent = agent;
     if (agent.status === 'idle' && prev.status !== 'idle') this.idleSince = performance.now();
+    if (agent.partner !== prev.partner) this.target = null; // new gossip partner, find a new spot
     this.decide();
   }
 
@@ -180,7 +185,10 @@ class Worker {
     const a = this.agent;
     let want: Target;
     if (a.status === 'leaving') want = 'exit';
-    else if (!this.seat()) want = 'pantry';
+    else if (a.status === 'slacking') {
+      if (a.activity === 'chat' || a.activity === 'cat') want = a.activity;
+      else want = a.activity === 'phone' && this.seat() ? 'seat' : 'pantry';
+    } else if (!this.seat()) want = 'pantry';
     else if (a.status === 'idle') want = this.place === 'pantry' || performance.now() - this.idleSince > 5000 ? 'pantry' : 'seat';
     else want = 'seat';
     if (want !== this.target) {
@@ -191,19 +199,33 @@ class Worker {
   }
 
   private go() {
-    if (this.target !== 'pantry') this.scene.releasePantry(this);
+    this.scene.releaseSpots(this, this.target);
     const L = this.scene.layout;
     const lane = L.spots.aisleEast[0];
     let dest: XY;
+    if (this.target === 'chat') {
+      const spot = this.scene.claimChat(this);
+      if (!spot) this.target = 'pantry';
+      else dest = spot;
+    }
     if (this.target === 'seat') dest = [this.seat()!.x, this.seat()!.y];
     else if (this.target === 'pantry') dest = this.scene.claimPantry(this);
-    else dest = L.spots.entrance;
+    else if (this.target === 'cat') dest = L.spots.cat;
+    else if (this.target === 'exit') dest = L.spots.entrance;
 
-    const here: XY = [this.pos.x, this.pos.y];
+    let here: XY = [this.pos.x, this.pos.y];
     const pts: XY[] = [];
-    if (Math.abs(here[0] - lane) > 0.05 && Math.abs(here[1] - dest[1]) > 0.05) pts.push([lane, here[1]]);
-    if (Math.abs(here[1] - dest[1]) > 0.05) pts.push([lane, dest[1]]);
-    pts.push(dest);
+    // the cot is in the way: step back out to the open floor before heading anywhere
+    if (here[0] < lane - 0.5 && here[1] > CAT_LANE + 0.05) {
+      here = [here[0], CAT_LANE];
+      pts.push(here);
+    }
+    // ...and come in to the cat the same way
+    const via: XY[] = this.target === 'cat' ? [[dest![0], CAT_LANE]] : [];
+    const aim = via[0] || dest!;
+    if (Math.abs(here[0] - lane) > 0.05 && Math.abs(here[1] - aim[1]) > 0.05) pts.push([lane, here[1]]);
+    if (Math.abs(here[1] - aim[1]) > 0.05) pts.push([lane, aim[1]]);
+    pts.push(...via, dest!);
 
     this.place = 'walk';
     this.glow.setVisible(false);
@@ -247,8 +269,8 @@ class Worker {
       this.scene.forget(this);
       return;
     }
-    this.place = this.target === 'seat' ? 'seat' : 'pantry';
-    this.sprite.setFlipX(false);
+    this.place = this.target!;
+    this.sprite.setFlipX(this.place === 'chat' && this.chatSlot === 0);
     this.pose();
   }
 
@@ -260,6 +282,11 @@ class Worker {
       const s = this.seat();
       if (!s) return;
       this.sprite.setPosition(s.anchor[0], s.anchor[1]).setDepth(s.row === 'row1' ? 10 : 30);
+      if (a.status === 'slacking') {
+        this.glow.setVisible(false);
+        this.sprite.play(`${k}-phone`, true);
+        return;
+      }
       const color = GLOW[a.status === 'waiting' ? 'wait' : a.kind] ?? GLOW.other;
       this.glow.setPosition(s.anchor[0], s.anchor[1] - 80).setDepth(this.sprite.depth - 0.5).setFillStyle(color, 0.22).setVisible(true);
       if (a.status === 'waiting') this.sprite.play(`${k}-raise`, true);
@@ -269,7 +296,8 @@ class Worker {
       this.glow.setVisible(false);
       const [x, y] = this.scene.project(this.pos.x, this.pos.y);
       this.sprite.setPosition(x, y).setDepth(this.scene.depthFor(this.pos.x, this.pos.y));
-      this.sprite.play(a.status === 'waiting' ? `${k}-stand` : `${k}-mug`, true);
+      const anim = this.place === 'chat' ? 'talk' : this.place === 'cat' ? 'pet' : a.status === 'waiting' ? 'stand' : 'mug';
+      this.sprite.play(`${k}-${anim}`, true);
     }
   }
 
@@ -291,8 +319,7 @@ class Worker {
     const lift = this.place === 'seat' ? 122 : 150;
     this.bubble.setPosition(this.sprite.x, this.sprite.y - lift - 4 * Math.sin(time / 450 + this.phase));
     const variant: Variant = a.status === 'waiting' ? 'ask' : a.status === 'working' && a.kind === 'bash' ? 'term' : 'say';
-    const name = a.isSub ? `${a.name}·实习` : a.name;
-    this.bubble.show(name, a.cast, lineOf(a), variant, pending, rawOf(a.raw));
+    this.bubble.show(a.name, a.cast, lineOf(a), variant, pending, rawOf(a.raw));
   }
 }
 
@@ -301,6 +328,7 @@ export class OfficeScene extends Phaser.Scene {
   layout!: Layout;
   workers = new Map<string, Worker>();
   pantryUse = new Map<number, Worker>();
+  chatUse = new Map<string, Worker>(); // "pair:slot" -> who stands there
   pendingByAgent = new Map<string, Pending>();
   seenFirstState = false;
   bossBubble!: Bubble;
@@ -348,12 +376,34 @@ export class OfficeScene extends Phaser.Scene {
     return [x + (Math.random() - 0.5) * 0.8, y + (Math.random() - 0.5) * 0.6];
   }
 
-  releasePantry(w: Worker) {
-    for (const [i, v] of this.pantryUse) if (v === w) this.pantryUse.delete(i);
+  // a gossip spot: next to the partner if they already found one, else an empty pair; null when all are taken
+  claimChat(w: Worker): XY | null {
+    const pairs = this.layout.spots.chat;
+    const at = (key: string) => {
+      const [p, s] = key.split(':').map(Number);
+      this.chatUse.set(key, w);
+      w.chatSlot = s;
+      return pairs[p][s];
+    };
+    for (const [key, v] of this.chatUse) if (v === w) return at(key);
+    for (const [key, v] of this.chatUse) {
+      if (v.agent.id !== w.agent.partner) continue;
+      const [p, s] = key.split(':').map(Number);
+      if (!this.chatUse.has(`${p}:${1 - s}`)) return at(`${p}:${1 - s}`);
+    }
+    for (let p = 0; p < pairs.length; p++) {
+      if (!this.chatUse.has(`${p}:0`) && !this.chatUse.has(`${p}:1`)) return at(`${p}:0`);
+    }
+    return null;
+  }
+
+  releaseSpots(w: Worker, keep?: Target | null) {
+    if (keep !== 'pantry') for (const [i, v] of this.pantryUse) if (v === w) this.pantryUse.delete(i);
+    if (keep !== 'chat') for (const [k, v] of this.chatUse) if (v === w) this.chatUse.delete(k);
   }
 
   forget(w: Worker) {
-    this.releasePantry(w);
+    this.releaseSpots(w);
     this.workers.delete(w.agent.id);
   }
 
@@ -374,6 +424,9 @@ export class OfficeScene extends Phaser.Scene {
       this.anims.create({ key: `${k}-walk`, frames: fr(['walk1', 'walk2']), frameRate: 7, repeat: -1 });
       this.anims.create({ key: `${k}-mug`, frames: fr(['mug', 'mug', 'mug', 'mug2']), frameRate: 2, repeat: -1 });
       this.anims.create({ key: `${k}-stand`, frames: fr(['stand']), frameRate: 1, repeat: -1 });
+      this.anims.create({ key: `${k}-phone`, frames: fr(['sit_phone', 'sit_phone', 'sit_phone', 'sit_phone2']), frameRate: 2, repeat: -1 });
+      this.anims.create({ key: `${k}-talk`, frames: fr(['talk1', 'talk2', 'talk1', 'talk2', 'talk1', 'talk1']), frameRate: 4, repeat: -1 });
+      this.anims.create({ key: `${k}-pet`, frames: fr(['pet1', 'pet2']), frameRate: 2, repeat: -1 });
     }
 
     this.wallTex = this.textures.createCanvas('walltext', this.layout.size[0], this.layout.size[1])!;

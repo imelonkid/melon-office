@@ -30,6 +30,7 @@ And it's a lot of fun to watch.
 ## Features
 
 - **One session, one employee.** Subagents join as interns, follow their lead, and leave when their task is done.
+- **The office is never empty.** A few residents (`--staff 3` by default, up to 5) hang around even with nothing running: scrolling their phones, gossiping in the pantry, petting the office cat. A new session is picked up by whoever is slacking, who puts the phone down and walks to their desk. When there are more sessions than residents, colleagues and numbered contractors walk in for the job and leave when it's done.
 - **Real behaviour, not a screensaver.** Driven by Claude Code hooks: employees walk in on `SessionStart`, work on `PreToolUse`, raise a hand on `PermissionRequest`, head to the pantry after `Stop`, and clock out on `SessionEnd`.
 - **Monitor glow by tool.** Green for editing, blue for reading and searching, orange for shell commands, red when waiting on you.
 - **Approve from the office.** Opt-in. Only when the page is open does the bridge hold a permission request for you (up to ~55 s); otherwise Claude falls back to the normal terminal prompt instantly.
@@ -81,7 +82,7 @@ npm run setup         # npm install + build + connect hooks + open the office
 | `update` | Update to the latest version |
 | `uninstall [--project]` | Remove Melon Office's hooks and leave everything else untouched |
 
-All of them take `--port 7777` and `--no-open`. Page options: `?record` for record mode, `?caption=0` to hide the caption.
+All of them take `--port 7777` and `--no-open`; `start` and `demo` also take `--staff 3` (residents who stay in the office without a session, 0–5). Page options: `?record` for record mode, `?caption=0` to hide the caption.
 
 ## How it works
 

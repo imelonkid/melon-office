@@ -111,11 +111,16 @@ CH = {
     'agua': dict(shirt='#f2a65a', hair='#5a3a22', pants='#3b3f5c', skin='#e9b58c'),
     'pi':   dict(shirt='#e8e4ee', hair='#8c5a3c', pants='#3b3f5c'),
     'boss': dict(shirt='#f4f1ea', hair='#2b2533', pants='#2e2a44'),
+    # walk-ins: 外包 and 实习生 who only come in for one job
+    'g1':   dict(shirt='#4fb3a9', hair='#23202e', pants='#3b3f5c'),
+    'g2':   dict(shirt='#f28fb1', hair='#4a2f2a', pants='#3b3f5c'),
+    'g3':   dict(shirt='#ffd27a', hair='#6b4a2f', pants='#3b3f5c'),
+    'g4':   dict(shirt='#8fa3d9', hair='#c06a3a', pants='#3b3f5c'),
 }
 ANCH = {}
 
 
-def chibi(r, who, ax, ay, seated, frame, blink=False, key=None, raise_=None, mug=None, walk=0):
+def chibi(r, who, ax, ay, seated, frame, blink=False, key=None, raise_=None, mug=None, walk=0, act=None):
     p = CH[who]
     skin = p.get('skin', '#f6cfab')
     if raise_ is None:
@@ -126,10 +131,11 @@ def chibi(r, who, ax, ay, seated, frame, blink=False, key=None, raise_=None, mug
         r.ell(ax, ay, 15, 4, '#000000', 0.22)
         la = -3 if walk == 1 else 0
         lb = -3 if walk == 2 else 0
-        r.rr(ax - 9, ay - 15 + la, ax - 1, ay + la, 3, p['pants'])
-        r.rr(ax + 1, ay - 15 + lb, ax + 9, ay + lb, 3, p['pants'])
+        leg = 8 if act == 'pet' else 15   # squatting down to the cat
+        r.rr(ax - 9, ay - leg + la, ax - 1, ay + la, 3, p['pants'])
+        r.rr(ax + 1, ay - leg + lb, ax + 9, ay + lb, 3, p['pants'])
         r.ell(ax - 5, ay - 1 + la, 6, 3, '#23232e'); r.ell(ax + 5, ay - 1 + lb, 6, 3, '#23232e')
-        by1 = ay - 13
+        by1 = ay - leg + 2
     else:
         by1 = ay
     by0 = by1 - 24
@@ -183,11 +189,17 @@ def chibi(r, who, ax, ay, seated, frame, blink=False, key=None, raise_=None, mug
     if blink:
         r.line([(ax - 8, hy + 4), (ax - 4, hy + 4)], INK, 1.8)
         r.line([(ax + 4, hy + 4), (ax + 8, hy + 4)], INK, 1.8)
+    elif act == 'phone':  # eyes on the screen
+        r.arc(ax - 6, hy + 4, 3, 2.4, 20, 160, INK, 1.8)
+        r.arc(ax + 6, hy + 4, 3, 2.4, 20, 160, INK, 1.8)
     else:
         r.ell(ax - 6, hy + 4, 2.2, 2.8, INK); r.ell(ax + 6, hy + 4, 2.2, 2.8, INK)
         r.ell(ax - 5.4, hy + 3, 0.8, 0.8, '#ffffff'); r.ell(ax + 6.6, hy + 3, 0.8, 0.8, '#ffffff')
     r.ell(ax - 10, hy + 8, 3, 1.8, '#f29a8a'); r.ell(ax + 10, hy + 8, 3, 1.8, '#f29a8a')
-    r.arc(ax, hy + 8, 3, 2, 20, 160, '#b5574a', 1.5)
+    if act == 'talk' and frame:
+        r.ell(ax, hy + 9.5, 3, 2.4, '#b5574a', outline=INK, w=1)
+    else:
+        r.arc(ax, hy + 8, 3, 2, 20, 160, '#b5574a', 1.5)
     if who == 'tian':
         r.ell(ax - 6, hy + 4, 5, 4.5, None, outline=INK, w=1.5)
         r.ell(ax + 6, hy + 4, 5, 4.5, None, outline=INK, w=1.5)
@@ -206,6 +218,19 @@ def chibi(r, who, ax, ay, seated, frame, blink=False, key=None, raise_=None, mug
         sy = by0 + (2 if frame else 4)
         r.arc(ax + 15, sy, 2, 3, 200, 340, '#c9c4d6', 1.3)
         r.arc(ax + 19, sy - 3, 2, 3, 20, 160, '#c9c4d6', 1.3)
+    if act == 'phone':  # both hands on a phone, the screen flickers between feeds
+        r.rr(ax - 8, by0 + 5, ax + 8, by0 + 19, 3, '#2a2440', outline=INK, w=1.5)
+        r.rr(ax - 6, by0 + 7, ax + 6, by0 + 17, 2, '#ff8fb1' if frame else '#7ec8f2', outline=None)
+        r.ell(ax - 9, by0 + 15, 3.5, 3.5, skin, outline=INK, w=1.2)
+        r.ell(ax + 9, by0 + 15 - (1.5 if frame else 0), 3.5, 3.5, skin, outline=INK, w=1.2)
+    if act == 'talk':  # one hand waving while gossiping
+        hy2 = by0 + (2 if frame else 6)
+        r.rr(ax - 26, hy2, ax - 12, hy2 + 7, 3.5, p['shirt'])
+        r.ell(ax - 27, hy2 + 3, 4.5, 4.5, skin, outline=INK, w=1.5)
+    if act == 'pet':  # reaching down to the cat
+        px = ax + 24 + (2 if frame else 0)
+        r.rr(ax + 10, by1 - 8, px, by1 - 1, 3.5, p['shirt'])
+        r.ell(px + 1, by1 - 4 + (1 if frame else 0), 4.5, 4, skin, outline=INK, w=1.5)
     r.ell(ax - 6, hy - 9, 3, 1.5, '#ffffff', a=0.35)
     if key:
         ANCH[key] = dict(x=round(ax), top=round(hy - hr - (20 if who in ('zi', 'boss') else 4)))
@@ -463,6 +488,13 @@ FRAMES = [
     ('walk2',      False, 0, False, False, False, 2, -1),
     ('mug',        False, 0, False, False, True,  0, 0),
     ('mug2',       False, 1, True,  False, True,  0, 0),
+    # 摸鱼: name, seated, frame, blink, raise, mug, walk, bob, act
+    ('sit_phone',  True,  0, False, False, False, 0, 0, 'phone'),
+    ('sit_phone2', True,  1, False, False, False, 0, 0, 'phone'),
+    ('talk1',      False, 0, False, False, False, 0, 0, 'talk'),
+    ('talk2',      False, 1, False, False, False, 0, -1, 'talk'),
+    ('pet1',       False, 0, False, False, False, 0, 0, 'pet'),
+    ('pet2',       False, 1, True,  False, False, 0, 0, 'pet'),
 ]
 
 
@@ -472,9 +504,9 @@ def export_size(im, w, h):
 
 def character_sheet(who):
     sheet = Image.new('RGBA', (CELL_W * len(FRAMES) * OUTSCALE, CELL_H * OUTSCALE), (0, 0, 0, 0))
-    for i, (name, seated, frame, blink, raise_, mug, walk, bob) in enumerate(FRAMES):
+    for i, (name, seated, frame, blink, raise_, mug, walk, bob, *act) in enumerate(FRAMES):
         r = R(CELL_W, CELL_H)
-        chibi(r, who, ANCHOR[0], ANCHOR[1] + bob, seated, frame, blink=blink, raise_=raise_, mug=mug, walk=walk)
+        chibi(r, who, ANCHOR[0], ANCHOR[1] + bob, seated, frame, blink=blink, raise_=raise_, mug=mug, walk=walk, act=act[0] if act else None)
         sheet.paste(export_size(r.im, CELL_W, CELL_H), (i * CELL_W * OUTSCALE, 0))
     return sheet
 
@@ -498,8 +530,11 @@ def layout():
             entrance=[8.7, 10.6],
             aisleEast=[8.72, 3.8],
             pantryDoor=[8.72, 6.9],
-            pantry=[[11.75, 6.35], [10.65, 7.05], [11.5, 9.0], [9.9, 9.2]],
+            pantry=[[12.4, 8.0], [9.6, 8.9], [11.6, 9.4], [13.3, 9.7]],
             rack=[1.55, 7.85],
+            cat=[2.25, 8.75],                                  # next to the 行政猫 on the cot
+            # gossip pairs, side by side on screen: one in the pantry, one on the open floor by the ball
+            chat=[[[9.6, 5.3], [11.2, 4.6]], [[5.2, 8.2], [6.6, 6.8]]],
             boss=[13.55, 3.25],
         ),
         wall=dict(  # 2x px anchors for wall text overlays

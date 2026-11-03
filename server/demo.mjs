@@ -88,20 +88,27 @@ async function play(office, sid, steps, extra = {}) {
   }
 }
 
-async function employee(office, sid, script, startDelay) {
+// a session does its script a few times with coffee breaks, ends, and after a while a new one starts,
+// so the video shows people picking up work and going back to 摸鱼
+async function employee(office, name, script, startDelay) {
   await sleep(startDelay);
-  office.handle(ev(sid, 'SessionStart', { source: 'startup' }));
-  await sleep(4000);
-  for (;;) {
-    await play(office, sid, script);
-    await sleep(jitter(16000)); // coffee break
+  for (let n = 1; ; n++) {
+    const sid = `demo-${name}-${n}`;
+    office.handle(ev(sid, 'SessionStart', { source: 'startup' }));
+    await sleep(4000);
+    do {
+      await play(office, sid, script);
+      await sleep(jitter(16000)); // coffee break
+    } while (Math.random() < 0.5);
+    office.handle(ev(sid, 'SessionEnd', { reason: 'other' }));
+    await sleep(jitter(30000));
   }
 }
 
 export function runDemo(office) {
   console.log('  演示模式：正在回放一天的大厂日常');
-  employee(office, 'demo-a', SCRIPTS.a, 300);
-  employee(office, 'demo-b', SCRIPTS.b, 2200);
-  employee(office, 'demo-c', SCRIPTS.c, 4200);
-  employee(office, 'demo-d', SCRIPTS.d, 6500);
+  employee(office, 'a', SCRIPTS.a, 3000);
+  employee(office, 'b', SCRIPTS.b, 9000);
+  employee(office, 'c', SCRIPTS.c, 16000);
+  employee(office, 'd', SCRIPTS.d, 24000);
 }

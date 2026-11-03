@@ -30,15 +30,19 @@ export function since(ts: number, now = Date.now()): string {
   return `${Math.floor(m / 60)}h${m % 60 ? ` ${m % 60}m` : ''}`;
 }
 
+export const ACTIVITY: Record<string, string> = { phone: '刷手机', chat: '聊八卦', cat: '撸猫', coffee: '喝咖啡' };
+
 export function dailyReport(stats: Stats, headcount: number): string {
   const align = Math.max(1, stats.prompts);
+  const slack = Math.round(stats.slack / 60000);
   return `今日带领团队交付 ${stats.delivered} 项，调用工具 ${stats.toolCalls} 次，拉通对齐 ${align} 次，` +
     `过审批 ${stats.approvals} 次，赋能 ${headcount} 位同学` +
     (stats.failures ? `，复盘翻车 ${stats.failures} 次` : '') +
+    (slack ? `，团队带薪摸鱼 ${slack} 分钟` : '') +
     '。明日继续抓手落地，打出组合拳。';
 }
 
-export function caption(working: number): string {
+export function caption(working: number, slacking = 0): string {
   const now = new Date();
   const hh = String(now.getHours()).padStart(2, '0');
   const mm = String(now.getMinutes()).padStart(2, '0');
@@ -46,6 +50,7 @@ export function caption(working: number): string {
   if (h >= 22 || h < 5) return `${hh}:${mm}，打车能报销了，AI 还在卷`;
   if (h >= 21) return `${hh}:${mm}，再坚持一下就能报销打车`;
   if (h >= 12 && h < 14) return `午休时间，${working} 位 AI 同事还在工位上`;
+  if (!working && slacking) return `没有需求，${slacking} 位 AI 同事在带薪摸鱼`;
   return `${working} 位 AI 同事正在为你打工`;
 }
 

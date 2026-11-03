@@ -1,9 +1,12 @@
-export type Status = 'thinking' | 'working' | 'waiting' | 'idle' | 'leaving' | 'gone';
+// idle: the session is done and waiting for you; slacking: a resident with no session at all
+export type Status = 'thinking' | 'working' | 'waiting' | 'idle' | 'slacking' | 'leaving' | 'gone';
+export type Activity = 'phone' | 'chat' | 'cat' | 'coffee';
 
 export interface Agent {
   id: string;
-  sessionId: string;
+  sessionId: string | null;
   isSub: boolean;
+  resident: boolean; // in the office even without a session
   parentName: string | null;
   cast: string;
   name: string;
@@ -18,6 +21,8 @@ export interface Agent {
   line: string;   // what they're doing, in plain Chinese
   gist: string;   // same without file/branch names (record mode)
   raw: string;    // short original command / tool call
+  activity: Activity | null; // what they do while slacking
+  partner: string | null;    // who they're gossiping with
   toolCalls: number;
   startedAt: number;
   updatedAt: number;
@@ -39,6 +44,7 @@ export interface Stats {
   approvals: number;
   prompts: number;
   failures: number;
+  slack: number; // ms the residents spent slacking
   since: number;
 }
 
@@ -66,6 +72,6 @@ export interface Layout {
   cell: { w: number; h: number; ax: number; ay: number };
   frames: string[];
   seats: { id: string; row: 'row1' | 'row2'; x: number; y: number; anchor: XY }[];
-  spots: { entrance: XY; aisleEast: XY; pantryDoor: XY; pantry: XY[]; rack: XY; boss: XY };
+  spots: { entrance: XY; aisleEast: XY; pantryDoor: XY; pantry: XY[]; rack: XY; boss: XY; cat: XY; chat: [XY, XY][] };
   wall: { banner: XY; clock: XY; projector: XY };
 }

@@ -33,7 +33,8 @@ function tick() {
   $('delivered').textContent = String(s?.stats.delivered ?? 0);
   const t = taxiCountdown();
   $('taxi').textContent = t ? `距打车报销 ${t}` : '打车可报销';
-  $('caption').textContent = SHOW_CAPTION ? caption(working) : '';
+  const slacking = live.filter((a) => a.status === 'slacking').length;
+  $('caption').textContent = SHOW_CAPTION ? caption(working, slacking) : '';
 }
 net.on(tick);
 setInterval(tick, 10000);
