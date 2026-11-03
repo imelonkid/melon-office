@@ -79,6 +79,58 @@ export function uninstall({ project = false } = {}) {
   return { file, changed: true };
 }
 
+// Our hooks as they are in the file, grouped by event (other people's hooks are left out).
+function ours(settings) {
+  const found = {};
+  for (const [ev, groups] of Object.entries(settings.hooks || {})) {
+    if (!Array.isArray(groups)) continue;
+    const list = groups.flatMap((g) => (g.hooks || []).filter(isOurs));
+    if (list.length) found[ev] = list;
+  }
+  return found;
+}
+
+// What install() would write for this port, grouped like ours().
+function expected(port, approvals) {
+  const want = {};
+  for (const ev of PASSIVE_EVENTS) want[ev] = [passiveHook(port)];
+  if (approvals) want.PermissionRequest = [permissionHook(port)];
+  return want;
+}
+
+const sameHooks = (a, b) => {
+  const norm = (o) => JSON.stringify(Object.keys(o).sort().map((ev) => [ev, o[ev]]));
+  return norm(a) === norm(b);
+};
+
+// Is Melon Office connected, and is it connected the way this version would do it?
+//   none:       none of our hooks (never installed, or removed)
+//   current:    exactly what install() writes for this port
+//   stale:      ours are there but differ (older version, missing events, other port, duplicates)
+//   unreadable: settings.json is not valid JSON; leave it for the user to fix
+// `approvals` is whether our PermissionRequest hook is there, so a repair keeps `--no-approvals`.
+export function check({ port = 7777, project = false } = {}) {
+  const file = settingsPath({ project });
+  let settings;
+  try {
+    settings = read(file);
+  } catch {
+    return { file, state: 'unreadable', approvals: false };
+  }
+  const found = ours(settings);
+  if (Object.keys(found).length === 0) return { file, state: 'none', approvals: false };
+  const approvals = Boolean(found.PermissionRequest);
+  return { file, state: sameHooks(found, expected(port, approvals)) ? 'current' : 'stale', approvals };
+}
+
+// Bring stale hooks up to date; anything else is left as it is. Returns check() plus `repaired`.
+export function repair({ port = 7777, project = false } = {}) {
+  const before = check({ port, project });
+  if (before.state !== 'stale') return { ...before, repaired: false };
+  install({ port, project, approvals: before.approvals });
+  return { ...check({ port, project }), repaired: true };
+}
+
 export function status({ project = false } = {}) {
   const file = settingsPath({ project });
   const settings = read(file);

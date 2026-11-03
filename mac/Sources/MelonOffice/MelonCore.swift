@@ -94,4 +94,8 @@ final class MelonCore {
     func hooksInstall(port: Int, approvals: Bool) -> [String: Any] { callJSON("hooksInstall", [port, approvals]) }
     func hooksUninstall() -> [String: Any] { callJSON("hooksUninstall") }
     func hooksEvents() -> [String] { callJSON("hooksStatus")["events"] as? [String] ?? [] }
+    /// "none" | "current" | "stale" | "unreadable" (see hooks-config.mjs check())
+    func hooksState(port: Int) -> String { callJSON("hooksCheck", [port])["state"] as? String ?? "unreadable" }
+    /// updates stale hooks in place, keeping whether approvals were connected; true if it changed anything
+    func hooksRepair(port: Int) -> Bool { callJSON("hooksRepair", [port])["repaired"] as? Bool ?? false }
 }

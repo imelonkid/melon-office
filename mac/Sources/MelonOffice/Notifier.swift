@@ -31,6 +31,15 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
         let detail: String
     }
 
+    /// a one-off notice with no buttons (e.g. "hooks updated"); dropped if notifications aren't allowed
+    func info(_ title: String, _ body: String) {
+        guard authorized else { return }
+        let content = UNMutableNotificationContent()
+        content.title = title
+        content.body = body
+        center.add(UNNotificationRequest(identifier: "info-\(UUID().uuidString)", content: content, trigger: nil))
+    }
+
     /// `asks`: approvals currently held open for the office to answer.
     func update(_ asks: [Ask]) {
         let ids = Set(asks.map(\.id))

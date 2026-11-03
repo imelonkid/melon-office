@@ -57,7 +57,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             if err == nil {
                 self.openOffice()
                 if self.defaults.bool(forKey: "widget") { self.toggleWidget() }
-                self.offerHooksOnce()
+                self.reconcileHooks()
             }
         }
     }
@@ -132,7 +132,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         for n in 0...5 { staffMenu.addItem(action(n == 0 ? "不要常驻" : "\(n) 人", #selector(setStaff(_:)), on: n == staff, represented: n)) }
         staffItem.submenu = staffMenu
         menu.addItem(staffItem)
-        menu.addItem(action("接入 Claude Code", #selector(toggleHooks), on: !core.hooksEvents().isEmpty))
+        let hooked = !core.hooksEvents().isEmpty
+        menu.addItem(action(hooked ? "接入 Claude Code" : "接入 Claude Code（未接入）", #selector(toggleHooks), on: hooked))
         menu.addItem(action("开机自启", #selector(toggleLogin), on: SMAppService.mainApp.status == .enabled))
         menu.addItem(action("设置…", #selector(openSettings), key: ","))
         menu.addItem(.separator())
@@ -208,21 +209,46 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             installHooks()
         } else {
             core.hooksUninstall()
+            hooksChoice = "declined" // removed on purpose: don't put them back on the next launch
             alert("已移除 Melon Office 的 hooks", "~/.claude/settings.json 里的其它配置原样保留。")
         }
     }
 
     private func installHooks() {
         let r = core.hooksInstall(port: port, approvals: true)
+        hooksChoice = "accepted"
         var info = "写入：\(r["file"] as? String ?? "~/.claude/settings.json")"
         if let backup = r["backup"] as? String { info += "\n原配置已备份：\(backup)" }
         alert("已接入 Claude Code", info + "\n\n之后新开的 Claude Code 会话会自动走进工区。")
     }
 
-    /// first launch: offer to wire up Claude Code if nothing is installed yet
-    private func offerHooksOnce() {
-        guard !defaults.bool(forKey: "askedHooks"), core.hooksEvents().isEmpty else { return }
-        defaults.set(true, forKey: "askedHooks")
+    /// "accepted" | "declined" | nil (never asked). Older versions only remembered that they had asked.
+    private var hooksChoice: String? {
+        get { defaults.string(forKey: "hooksChoice") ?? (defaults.bool(forKey: "askedHooks") ? "declined" : nil) }
+        set { defaults.set(newValue, forKey: "hooksChoice") }
+    }
+
+    /// every launch: make sure Claude Code is wired up the way this version expects
+    ///   current → nothing; stale (older version, other port) → update quietly, keeping the approvals choice;
+    ///   none → ask once, and never again after 以后再说 or 移除; unreadable settings.json → leave it alone
+    private func reconcileHooks() {
+        switch core.hooksState(port: port) {
+        case "current":
+            hooksChoice = "accepted"
+        case "stale":
+            hooksChoice = "accepted" // our hooks are there, so the user connected us at some point
+            if core.hooksRepair(port: port) {
+                notifier.info("已更新 Claude Code 接入", "~/.claude/settings.json 里 Melon Office 的 hooks 已更新到当前版本，其它配置原样保留。")
+            }
+        case "none":
+            if hooksChoice == nil { offerHooks() }
+        default:
+            NSLog("[melon] ~/.claude/settings.json 不是合法的 JSON，跳过 hooks 检查")
+        }
+    }
+
+    private func offerHooks() {
+        hooksChoice = "declined" // until they click 接入
         let a = NSAlert()
         a.messageText = "接入 Claude Code？"
         a.informativeText = "Melon Office 会在 ~/.claude/settings.json 里加几条 hooks（先备份原文件），Claude Code 的会话才能走进工区。随时可以在菜单栏里移除。"

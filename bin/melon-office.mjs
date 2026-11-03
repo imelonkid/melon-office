@@ -8,7 +8,7 @@ import { spawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { install, uninstall, status } from '../server/hooks-config.mjs';
+import { install, uninstall, status, check, repair } from '../server/hooks-config.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const args = process.argv.slice(2);
@@ -57,8 +57,13 @@ async function run() {
     }
     case 'status': {
       const r = status({ project: flag('project') });
+      const c = check({ port, project: flag('project') });
       console.log(`\n  配置文件：${r.file}`);
-      console.log(r.events.length ? `  已接入事件：${r.events.join(', ')}\n` : '  还没有接入，先运行 `melon-office init`\n');
+      if (c.state === 'unreadable') console.log('  配置文件不是合法的 JSON，先修好它再接入\n');
+      else if (r.events.length) {
+        console.log(`  已接入事件：${r.events.join(', ')}`);
+        console.log(c.state === 'stale' ? '  配置是旧版本或端口不同，运行 `melon-office init` 更新\n' : '');
+      } else console.log('  还没有接入，先运行 `melon-office init`\n');
       break;
     }
     case 'update': {
@@ -76,6 +81,10 @@ async function run() {
       const { startServer } = await import('../server/index.mjs');
       const { url } = await startServer({ port, staff, demo: cmd === 'demo' });
       console.log(`\n  🍈 Melon Office 已开工 → ${url}`);
+      // hooks left by an older version (or another port) are brought up to date; never installed stays that way
+      let repaired = false;
+      try { repaired = cmd === 'start' && repair({ port }).repaired; } catch { /* the office runs anyway */ }
+      if (repaired) console.log('  已更新 Claude Code 接入配置（~/.claude/settings.json）');
       if (cmd === 'start' && status().events.length === 0 && status({ project: true }).events.length === 0) {
         console.log('  提示：还没接入 Claude Code，另开一个终端运行 `melon-office init`');
       }
