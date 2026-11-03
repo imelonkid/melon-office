@@ -4,6 +4,7 @@ import path from 'node:path';
 import { humanize } from './translate.mjs';
 import { loadSettings, saveSettings } from './settings.mjs';
 import { reportText, saveReport } from './report.mjs';
+import { Memory } from './memory.mjs';
 
 export const CAST = [
   { key: 'gua', name: '小瓜', role: '前端', level: 'P6' },
@@ -63,7 +64,8 @@ export { humanize, shortCommand } from './translate.mjs';
 
 export class Office extends EventEmitter {
   // staff: how many employees are in the office even when no session is running
-  constructor({ staff = 3 } = {}) {
+  // remember: keep who-worked-on-what on disk (off for the demo)
+  constructor({ staff = 3, remember = true } = {}) {
     super();
     this.agents = new Map();
     this.links = new Map(); // session key (session_id, or session_id:agent_id) -> agent id
@@ -74,6 +76,7 @@ export class Office extends EventEmitter {
     this.lastScold = Date.now() - SCOLD_GAP + 60000; // first speech no sooner than a minute after opening
     this.approvals = { enabled: true, clients: 0 };
     this.settings = loadSettings();
+    this.memory = new Memory({ persist: remember });
     this.lastReport = null;
     this.seq = 0;
     this.hired = { guest: 0, intern: 0, contractor: 0 };
@@ -107,10 +110,11 @@ export class Office extends EventEmitter {
 
   // someone new walking in: a cast member who isn't in the office yet, else a numbered 外包 / 实习生.
   // Numbers only go up, so two people never share a name.
-  hire(isSub) {
+  // prefer: a cast key to bring back (the person who worked on this before)
+  hire(isSub, prefer = null) {
     if (!isSub) {
       const present = new Set([...this.agents.values()].map((a) => a.cast));
-      const free = CAST.find((c) => !present.has(c.key));
+      const free = CAST.find((c) => c.key === prefer && !present.has(c.key)) || CAST.find((c) => !present.has(c.key));
       if (free) return { ...free };
     }
     const cast = GUESTS[this.hired.guest++ % GUESTS.length];
@@ -143,15 +147,26 @@ export class Office extends EventEmitter {
     if (known) return known;
 
     const project = evt.cwd ? path.basename(evt.cwd) : '';
+    const isSub = Boolean(evt.agent_id);
+    // the same job goes back to the same person: whoever had this session before (resumed),
+    // else whoever worked in this project last. If they're busy, someone else takes it.
+    const bySession = isSub ? null : this.memory.forSession(sid);
+    const owner = bySession || (isSub ? null : this.memory.forProject(evt.cwd));
+    const welcomeBack = bySession ? '接着上次的活干' : '这个项目我熟，我来';
     // a resident with nothing to do takes the job; subagents are always fresh interns
-    let a = evt.agent_id ? null : [...this.agents.values()].find((x) => x.resident && x.status === 'slacking');
+    const slackers = isSub ? [] : [...this.agents.values()].filter((x) => x.resident && x.status === 'slacking');
+    // an owner who isn't in the office (a colleague who came in for it last time) is called back in,
+    // even when a resident is free
+    const ownerAway = owner && ![...this.agents.values()].some((x) => x.cast === owner);
+    let a = slackers.find((x) => owner && x.cast === owner) || (ownerAway ? null : slackers[0]) || null;
     if (a) {
       this.stopSlacking(a);
-      this.set(a, { sessionId: sid, project, status: 'thinking', kind: 'think', tool: '', detail: '', toolCalls: 0, startedAt: Date.now(), line: '来活了，放下手机' });
+      const line = owner && a.cast === owner ? welcomeBack : '来活了，放下手机';
+      this.set(a, { sessionId: sid, project, status: 'thinking', kind: 'think', tool: '', detail: '', toolCalls: 0, startedAt: Date.now(), line });
     } else {
-      const parent = evt.agent_id ? this.agents.get(this.links.get(sid)) : null;
-      const cast = this.hire(Boolean(evt.agent_id));
-      const line = evt.agent_id ? `实习生报到，跟着${parent?.name || '组长'}干` : '新同学入职，先熟悉一下项目';
+      const parent = isSub ? this.agents.get(this.links.get(sid)) : null;
+      const cast = this.hire(isSub, owner);
+      const line = isSub ? `实习生报到，跟着${parent?.name || '组长'}干` : owner && cast.key === owner ? welcomeBack : '新同学入职，先熟悉一下项目';
       a = this.blank(key, cast, {
         sessionId: sid, isSub: Boolean(evt.agent_id), parentName: parent?.name || null,
         project, seat: this.freeSeat(), line, gist: line,
@@ -159,6 +174,11 @@ export class Office extends EventEmitter {
       this.agents.set(a.id, a);
     }
     this.links.set(key, a.id);
+    if (!isSub && CAST.some((c) => c.key === a.cast)) { // not the numbered 外包
+      // helping out while the owner is busy elsewhere doesn't make you the project's owner
+      const ownerBusy = owner && owner !== a.cast && [...this.agents.values()].some((x) => x.cast === owner && x.sessionId);
+      this.memory.remember(sid, evt.cwd, a.cast, { project: !ownerBusy });
+    }
     this.log(a, a.line);
     return a;
   }
@@ -297,7 +317,7 @@ export class Office extends EventEmitter {
 
     switch (ev) {
       case 'SessionStart':
-        this.set(a, { status: 'thinking', kind: 'think', line: evt.source === 'resume' ? '接着昨天的活干' : evt.source === 'compact' ? '整理完工位，继续' : a.line });
+        this.set(a, { status: 'thinking', kind: 'think', line: evt.source === 'resume' ? '接着上次的活干' : evt.source === 'compact' ? '整理完工位，继续' : a.line });
         break;
       case 'UserPromptSubmit':
         this.stats.prompts++;

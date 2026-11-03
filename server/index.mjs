@@ -68,7 +68,7 @@ function serveStatic(req, res) {
 }
 
 export async function startServer({ port = 7777, host = '127.0.0.1', demo = false, staff = 3 } = {}) {
-  const office = new Office({ staff });
+  const office = new Office({ staff, remember: !demo });
 
   const server = http.createServer(async (req, res) => {
     const { pathname } = new URL(req.url, 'http://x');
