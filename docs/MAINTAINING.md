@@ -54,3 +54,14 @@
 
 - 命令行版与 Mac 版都占 7777 端口，不能同时运行
 - hooks 指向固定端口：改了端口要重新「接入 Claude Code」
+
+## 手工验收：启动时接入 Claude Code（Mac 版）
+
+单测覆盖了 `check()` / `repair()`；弹窗、通知、菜单要在真机上点。先备份 `~/.claude/settings.json`，`defaults delete cn.melonkid.melon-office hooksChoice` 清掉记住的选择。
+
+| 场景 | 怎么准备 | 期望 |
+|---|---|---|
+| 全新用户 | `melon-office uninstall`，清掉 `hooksChoice` 与 `askedHooks` | 打开 App 弹「接入 Claude Code？」；点「接入」后 `melon-office status` 列出全部事件 |
+| 已接入用户升级 | `melon-office init --port 8123`（模拟旧配置） | 打开 App 不弹窗，收到「已更新 Claude Code 接入」通知；`status` 不再提示过期 |
+| 拒绝过的用户 | 弹窗点「以后再说」，或菜单里移除 | 再次打开不弹窗；菜单显示「接入 Claude Code（未接入）」 |
+| 命令行版装过 | `melon-office init --no-approvals` | 打开 App 不弹窗、不改配置（已是当前版本），审批仍走终端 |
