@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { install, uninstall, status, settingsPath, PASSIVE_EVENTS } from '../server/hooks-config.mjs';
+import { install, uninstall, status, check, repair, settingsPath, PASSIVE_EVENTS } from '../server/hooks-config.mjs';
 
 let home;
 const file = () => path.join(home, '.claude', 'settings.json');
@@ -141,4 +141,67 @@ test('--project writes .claude/settings.local.json in the current directory', ()
   } finally {
     process.chdir(cwd);
   }
+});
+
+// —— check() / repair(): what the Mac app and `melon-office start` run on every launch ——
+
+test('check: nothing installed is none, and repair leaves it alone', () => {
+  assert.equal(check().state, 'none');
+  write(theirs);
+  assert.equal(check().state, 'none');
+  const r = repair();
+  assert.equal(r.repaired, false);
+  assert.deepEqual(read(), theirs);
+});
+
+test('check: a fresh install is current, with or without approvals', () => {
+  install();
+  assert.deepEqual(check(), { file: file(), state: 'current', approvals: true });
+  install({ approvals: false });
+  assert.deepEqual(check(), { file: file(), state: 'current', approvals: false });
+  assert.equal(repair().repaired, false);
+});
+
+test('check: hooks for another port are stale, repair moves them and keeps approvals off', () => {
+  install({ port: 8123, approvals: false });
+  assert.equal(check({ port: 7777 }).state, 'stale');
+  const r = repair({ port: 7777 });
+  assert.equal(r.repaired, true);
+  assert.equal(r.state, 'current');
+  assert.equal(r.approvals, false);
+  assert.match(read().hooks.Stop[0].hooks[0].command, /:7777\//);
+  assert.equal(read().hooks.PermissionRequest, undefined);
+});
+
+test('check: an older install missing events or with an old command is stale, repair fixes it', () => {
+  write(theirs);
+  install();
+  const s = read();
+  delete s.hooks.PreCompact;                                         // event added in a later version
+  s.hooks.SessionStart[0].hooks[0].command = "curl -s -H 'X-Melon-Office: 1' http://127.0.0.1:7777/hook"; // old command
+  write(s);
+  assert.equal(check().state, 'stale');
+  assert.equal(repair().repaired, true);
+  assert.equal(check().state, 'current');
+  // other people's hooks are still there, once
+  assert.deepEqual(read().hooks.PreToolUse.filter((g) => g.matcher === 'Bash'), theirs.hooks.PreToolUse);
+  assert.deepEqual(read().hooks.Stop[0], theirs.hooks.Stop[0]);
+});
+
+test('check: duplicated hooks are stale, repair leaves one of each', () => {
+  install();
+  const s = read();
+  s.hooks.Stop.push(s.hooks.Stop[0]);
+  write(s);
+  assert.equal(check().state, 'stale');
+  repair();
+  assert.equal(read().hooks.Stop.length, 1);
+});
+
+test('check: invalid JSON is unreadable and repair never overwrites it', () => {
+  fs.mkdirSync(path.dirname(file()), { recursive: true });
+  fs.writeFileSync(file(), '{ "hooks": ');
+  assert.equal(check().state, 'unreadable');
+  assert.equal(repair().repaired, false);
+  assert.equal(fs.readFileSync(file(), 'utf8'), '{ "hooks": ');
 });

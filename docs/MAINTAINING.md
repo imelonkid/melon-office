@@ -28,7 +28,7 @@
 | 单测：hooks 的安装 / 移除 / 状态（`test/`） | ✓ |
 | 打包钩子 `scripts/package-desktop.sh`、发布脚本 `scripts/release-desktop.sh`、发布表单 `release-desktop.yml` | 待做 |
 | 客户端检查更新（读 `latest.json`） | 待做 |
-| 启动时对账 Claude Code hooks（缺了问、旧了修、拒绝过不再弹） | 待做 |
+| 启动时对账 Claude Code hooks（缺了问、旧了修、拒绝过不再弹；`hooks-config.mjs` 的 `check()` / `repair()`，Mac 版与 `melon-office start` 共用） | ✓ |
 | GitHub 设置（`github-apply.sh --kind desktop`）、production 环境 | 待做 |
 | 对象存储下载站前缀、只写子账号 | 待做 |
 | 门户登记（运维仓库 `portal/config.json`） | 待做 |

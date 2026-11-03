@@ -2,7 +2,7 @@
 // JavaScriptCore, so the native app and the Node server share office.mjs, translate.mjs and hooks-config.mjs.
 // `native` is provided by Swift (MelonCore.swift): timers, files, and callbacks back into the app.
 import { Office } from '../../server/office.mjs';
-import { install, uninstall, status } from '../../server/hooks-config.mjs';
+import { install, uninstall, status, check, repair } from '../../server/hooks-config.mjs';
 
 let office;
 let clients = 0;
@@ -49,6 +49,9 @@ globalThis.MelonCore = {
   hooksInstall: (port, approvals) => JSON.stringify(install({ port, approvals })),
   hooksUninstall: () => JSON.stringify(uninstall()),
   hooksStatus: () => JSON.stringify(status()),
+  // launch-time reconcile: { state: none | current | stale | unreadable, approvals, repaired }
+  hooksCheck: (port) => JSON.stringify(check({ port })),
+  hooksRepair: (port) => JSON.stringify(repair({ port })),
 };
 
 // keep "x 分钟" style timers fresh even when nothing happens

@@ -81,7 +81,7 @@ npm run setup         # npm install + build + connect hooks + open the office
 | `melon-office` | Open the office (same as `start`) |
 | `demo` | Open the office with a scripted day of work |
 | `init [--project] [--no-approvals]` | Connect the hooks. `--project` writes to `.claude/settings.local.json` in the current repo only. `--no-approvals` keeps permission prompts in the terminal. |
-| `status` | Show which hook events are connected |
+| `status` | Show which hook events are connected, and whether they're out of date |
 | `update` | Update to the latest version |
 | `uninstall [--project]` | Remove Melon Office's hooks and leave everything else untouched |
 
@@ -104,6 +104,7 @@ A native macOS version lives in [`mac/`](mac): a menu bar app that runs the offi
 - **Menu bar**: 🍈 shows how many employees are working and how many approvals are waiting; approve or deny right from the menu.
 - **Approval notifications**: requests show up as macOS notifications with 同意 / 驳回 buttons, so the office can hold them even with no window open.
 - **Desk widget**: an always-on-top, transparent mini office for a corner of your screen. Clicks pass through the empty corners.
+- **Connects itself to Claude Code**: on first launch it asks once whether to add its hooks. After that, every launch checks them: hooks left by an older version (or a different port) are updated in place, keeping your choice about approvals. If you said no, or removed them from the menu, it won't ask again; 接入 Claude Code in the menu brings them back.
 - **Native rendering**: the office is drawn with SpriteKit and the OA panel with SwiftUI, from the same art as the web version.
 - **Same brain**: `server/office.mjs`, `translate.mjs` and `hooks-config.mjs` run inside JavaScriptCore, and the app serves the same hook endpoints on port 7777, so the hooks and the browser version work unchanged. Don't run the CLI and the app at the same time.
 
