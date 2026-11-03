@@ -40,7 +40,7 @@ cp mac/AppIcon.icns "$OUT/core.js" "$APP/Contents/Resources/"
 cp -R web/public/assets "$APP/Contents/Resources/assets"   # art for the native office
 cp -R dist "$APP/Contents/Resources/dist"                   # web version, for 「在浏览器中打开」
 
-step "签名（$IDENTITY）"
+step "签名（${IDENTITY}）"
 codesign --force --options runtime --timestamp --entitlements mac/MelonOffice.entitlements --sign "$IDENTITY" "$APP"
 codesign --verify --strict --verbose=1 "$APP"
 

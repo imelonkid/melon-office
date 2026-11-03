@@ -1,0 +1,12 @@
+# PR 检查：密钥扫描、运维规范、scripts/ci-test.sh。流水线本体在 imelonkid/melon-ci。
+# PR 一律以 main 为目标，不开叠加 PR。
+name: ci
+on:
+  pull_request:
+  push:
+    branches: [main]
+jobs:
+  check:
+    uses: imelonkid/melon-ci/.github/workflows/pr-check.yml@v2
+    with:
+      node-version: "22"
