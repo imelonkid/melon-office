@@ -42,37 +42,46 @@ And it's a lot of fun to watch.
 
 ## Quick start
 
-Requires Node 18+ and Claude Code.
+One line. Requires Node 18+, git and Claude Code (macOS or Linux).
 
 ```bash
-git clone https://github.com/<you>/melon-office.git
+curl -fsSL https://raw.githubusercontent.com/imelonkid/melon-office/main/install.sh | bash
+```
+
+It downloads Melon Office to `~/.melon-office`, builds it, adds a `melon-office` command, connects the Claude Code hooks (your `settings.json` is backed up first) and opens the office at http://127.0.0.1:7777.
+
+From then on:
+
+```bash
+melon-office          # open the office
+melon-office demo     # a scripted day at the office, great for recording
+```
+
+Use Claude Code as usual. New sessions walk into the office on their own.
+
+<details>
+<summary>Prefer to install by hand?</summary>
+
+```bash
+git clone https://github.com/imelonkid/melon-office.git
 cd melon-office
-npm install
-npm run build
-
-node bin/melon-office.mjs init    # add hooks to ~/.claude/settings.json (backs up the original)
-node bin/melon-office.mjs start   # open the office at http://127.0.0.1:7777
+npm run setup         # npm install + build + connect hooks + open the office
 ```
 
-Then use Claude Code as usual. New sessions walk into the office on their own.
-
-Just want to look around first?
-
-```bash
-npm run build && node bin/melon-office.mjs demo
-```
+</details>
 
 ## Commands
 
 | Command | What it does |
 |---|---|
-| `init [--project] [--port 7777] [--no-approvals]` | Install the hooks. `--project` writes to `.claude/settings.local.json` in the current repo only. `--no-approvals` keeps permission prompts in the terminal. |
-| `start [--port] [--no-open]` | Start the office |
-| `demo [--port] [--no-open]` | Start the office with a scripted day of work |
+| `melon-office` | Open the office (same as `start`) |
+| `demo` | Open the office with a scripted day of work |
+| `init [--project] [--no-approvals]` | Connect the hooks. `--project` writes to `.claude/settings.local.json` in the current repo only. `--no-approvals` keeps permission prompts in the terminal. |
 | `status` | Show which hook events are connected |
+| `update` | Update to the latest version |
 | `uninstall [--project]` | Remove Melon Office's hooks and leave everything else untouched |
 
-Page options: `?record` for record mode, `?caption=0` to hide the caption.
+All of them take `--port 7777` and `--no-open`. Page options: `?record` for record mode, `?caption=0` to hide the caption.
 
 ## How it works
 

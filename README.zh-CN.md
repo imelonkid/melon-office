@@ -40,37 +40,52 @@
 
 ## 快速开始
 
-需要 Node 18+ 和 Claude Code。
+一行命令装好。需要 Node 18+、git 和 Claude Code（macOS / Linux）。
 
 ```bash
-git clone https://github.com/<you>/melon-office.git
+curl -fsSL https://raw.githubusercontent.com/imelonkid/melon-office/main/install.sh | bash
+```
+
+国内网络慢的话，用 npm 镜像：
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/imelonkid/melon-office/main/install.sh | MELON_OFFICE_MIRROR=cn bash
+```
+
+脚本会把 Melon Office 装到 `~/.melon-office`，构建好工区，添加 `melon-office` 命令，接入 Claude Code 的 hooks（会先备份你的 `settings.json`），然后打开 http://127.0.0.1:7777 。
+
+以后开工只要：
+
+```bash
+melon-office          # 开工
+melon-office demo     # 演示模式，录视频专用
+```
+
+照常使用 Claude Code，新开的会话会自己走进工区。
+
+<details>
+<summary>想手动安装？</summary>
+
+```bash
+git clone https://github.com/imelonkid/melon-office.git
 cd melon-office
-npm install
-npm run build
-
-node bin/melon-office.mjs init    # 往 ~/.claude/settings.json 写入 hooks（会先备份）
-node bin/melon-office.mjs start   # 打开工区 http://127.0.0.1:7777
+npm run setup         # 装依赖 + 构建 + 接入 hooks + 开工
 ```
 
-然后照常使用 Claude Code，新开的会话会自己走进工区。
-
-只想先看看效果：
-
-```bash
-npm run build && node bin/melon-office.mjs demo
-```
+</details>
 
 ## 命令
 
 | 命令 | 作用 |
 |---|---|
-| `init [--project] [--port 7777] [--no-approvals]` | 写入 hooks。`--project` 只写当前项目的 `.claude/settings.local.json`；`--no-approvals` 审批仍走终端 |
-| `start [--port] [--no-open]` | 开工 |
-| `demo [--port] [--no-open]` | 演示模式 |
+| `melon-office` | 开工（等同 `start`） |
+| `demo` | 演示模式，回放一天的大厂日常 |
+| `init [--project] [--no-approvals]` | 接入 Claude Code。`--project` 只写当前项目的 `.claude/settings.local.json`；`--no-approvals` 审批仍走终端 |
 | `status` | 查看接入了哪些事件 |
+| `update` | 更新到最新版 |
 | `uninstall [--project]` | 移除 Melon Office 的 hooks，其它配置原样保留 |
 
-页面参数：`?record` 录屏模式，`?caption=0` 关闭底部字幕。
+都支持 `--port 7777` 和 `--no-open`。页面参数：`?record` 录屏模式，`?caption=0` 关闭底部字幕。
 
 ## 工作原理
 
