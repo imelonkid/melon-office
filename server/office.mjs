@@ -29,6 +29,19 @@ const GOSSIP = [
   ['老板说的抓手到底是啥', '不知道，先对齐一下'],
 ];
 
+// 瓜老板 comes out to give a speech when too many people are slacking
+const SCOLD_MS = 15000;
+const SCOLD_GAP = 180000; // at most once every 3 minutes
+const SCOLD = [
+  '我看到很多同学在摸鱼，我很痛心',
+  '你的价值在哪里？护城河在哪里？',
+  '今天最好的表现，是明天最低的要求',
+  '都几点了还在刷手机？结果呢？抓手呢？',
+  '我不看过程，我只看结果',
+  '公司不养闲人，大家自己想想',
+];
+const FAKE_BUSY = ['在改了在改了', '马上马上', '我在对齐需求', '正在梳理方法论', '刚在想方案'];
+
 const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
 const pad2 = (n) => String(n).padStart(2, '0');
 
@@ -54,7 +67,9 @@ export class Office extends EventEmitter {
     this.links = new Map(); // session key (session_id, or session_id:agent_id) -> agent id
     this.pending = new Map();
     this.feed = [];
-    this.stats = { delivered: 0, toolCalls: 0, approvals: 0, prompts: 0, failures: 0, slack: 0, since: Date.now() };
+    this.stats = { delivered: 0, toolCalls: 0, approvals: 0, prompts: 0, failures: 0, slack: 0, scoldings: 0, since: Date.now() };
+    this.scold = null;
+    this.lastScold = Date.now() - SCOLD_GAP + 60000; // first speech no sooner than a minute after opening
     this.approvals = { enabled: true, clients: 0 };
     this.seq = 0;
     this.hired = { guest: 0, intern: 0, contractor: 0 };
@@ -159,7 +174,7 @@ export class Office extends EventEmitter {
     const now = Date.now();
     const slackers = [...this.agents.values()].filter((x) => x.status === 'slacking');
     const chats = slackers.filter((x) => x.activity === 'chat').length / 2;
-    const free = slackers.filter((x) => x !== a && !x.partner);
+    const free = slackers.filter((x) => x !== a && !x.partner && x.activity !== 'fake');
     const mate = chats < CHAT_PAIRS && free.length && Math.random() < 0.5 ? pick(free) : null;
     const until = now + 25000 + Math.random() * 25000;
     if (mate) {
@@ -187,7 +202,37 @@ export class Office extends EventEmitter {
       if (mate && mate.status === 'slacking' && !mate.activity) this.pickActivity(mate);
       moved = true;
     }
+    if (this.maybeScold(now)) moved = true;
     if (moved) this.changed();
+  }
+
+  // ---------- 训话 ----------
+  maybeScold(now) {
+    if (this.scold || now - this.lastScold < SCOLD_GAP) return false;
+    const live = [...this.agents.values()].filter((x) => x.status !== 'leaving');
+    const slackers = live.filter((x) => x.status === 'slacking');
+    if (slackers.length < 3 && !(slackers.length >= 2 && slackers.length / live.length >= 0.6)) return false;
+
+    const lines = [...SCOLD].sort(() => Math.random() - 0.5).slice(0, 2);
+    this.scold = { id: `s${++this.seq}`, startedAt: now, until: now + SCOLD_MS, lines };
+    this.lastScold = now;
+    this.stats.scoldings++;
+    for (const a of slackers) {
+      // everyone scrambles back to their desk and pretends to work until a little after he leaves
+      this.set(a, { activity: 'fake', partner: null, slackUntil: now + SCOLD_MS + 2000 + Math.random() * 6000, line: pick(FAKE_BUSY) });
+    }
+    this.feed.unshift({ t: now, agentId: '', name: '瓜老板', text: '在工区训话' });
+    setTimeout(() => this.endScold(), SCOLD_MS).unref();
+    return true;
+  }
+
+  endScold() {
+    this.scold = null;
+    // somebody always mutters the obvious once he's gone
+    const fakers = [...this.agents.values()].filter((x) => x.status === 'slacking' && x.activity === 'fake');
+    const who = fakers.length ? pick(fakers) : null;
+    if (who) this.set(who, { line: '那倒是给我派活啊', slackUntil: Math.max(who.slackUntil, Date.now() + 6000) });
+    this.changed();
   }
 
   set(a, patch) {
@@ -356,6 +401,7 @@ export class Office extends EventEmitter {
       stats: { ...this.stats, slack: this.stats.slack + this.slackingNow() },
       feed: this.feed.slice(0, 12),
       approvals: { enabled: this.approvals.enabled, active: this.canHold() },
+      scold: this.scold,
       now: Date.now(),
     };
   }

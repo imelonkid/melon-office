@@ -196,7 +196,11 @@ def chibi(r, who, ax, ay, seated, frame, blink=False, key=None, raise_=None, mug
         r.ell(ax - 6, hy + 4, 2.2, 2.8, INK); r.ell(ax + 6, hy + 4, 2.2, 2.8, INK)
         r.ell(ax - 5.4, hy + 3, 0.8, 0.8, '#ffffff'); r.ell(ax + 6.6, hy + 3, 0.8, 0.8, '#ffffff')
     r.ell(ax - 10, hy + 8, 3, 1.8, '#f29a8a'); r.ell(ax + 10, hy + 8, 3, 1.8, '#f29a8a')
-    if act == 'talk' and frame:
+    if act == 'scold':  # frowning, mouth open mid-rant
+        r.line([(ax - 10, hy - 0.5), (ax - 3, hy + 2)], INK, 2.4)
+        r.line([(ax + 10, hy - 0.5), (ax + 3, hy + 2)], INK, 2.4)
+        r.ell(ax, hy + 10, 3.5 if frame else 2.5, 2.8 if frame else 1.8, '#b5574a', outline=INK, w=1)
+    elif act == 'talk' and frame:
         r.ell(ax, hy + 9.5, 3, 2.4, '#b5574a', outline=INK, w=1)
     else:
         r.arc(ax, hy + 8, 3, 2, 20, 160, '#b5574a', 1.5)
@@ -227,6 +231,14 @@ def chibi(r, who, ax, ay, seated, frame, blink=False, key=None, raise_=None, mug
         hy2 = by0 + (2 if frame else 6)
         r.rr(ax - 26, hy2, ax - 12, hy2 + 7, 3.5, p['shirt'])
         r.ell(ax - 27, hy2 + 3, 4.5, 4.5, skin, outline=INK, w=1.5)
+    if act == 'scold':  # one hand on the hip, the other pointing at the desks
+        sleeve = '#2e2a44' if who == 'boss' else p['shirt']
+        r.rr(ax + 12, by0 + 6, ax + 20, by0 + 18, 3.5, sleeve)
+        r.ell(ax + 15, by0 + 19, 4, 4, skin, outline=INK, w=1.5)
+        py = by0 - (8 if frame else 2)
+        r.rr(ax - 28, py, ax - 12, py + 7, 3.5, sleeve)
+        r.ell(ax - 29, py + 3, 4.5, 4.5, skin, outline=INK, w=1.5)
+        r.line([(ax - 33, py + 2), (ax - 37, py)], skin, 2.5)
     if act == 'pet':  # reaching down to the cat
         px = ax + 24 + (2 if frame else 0)
         r.rr(ax + 10, by1 - 8, px, by1 - 1, 3.5, p['shirt'])
@@ -495,6 +507,9 @@ FRAMES = [
     ('talk2',      False, 1, False, False, False, 0, -1, 'talk'),
     ('pet1',       False, 0, False, False, False, 0, 0, 'pet'),
     ('pet2',       False, 1, True,  False, False, 0, 0, 'pet'),
+    # 瓜老板训话
+    ('scold1',     False, 0, False, False, False, 0, 0, 'scold'),
+    ('scold2',     False, 1, False, False, False, 0, -1, 'scold'),
 ]
 
 

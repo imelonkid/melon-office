@@ -34,7 +34,7 @@ function tick() {
   const t = taxiCountdown();
   $('taxi').textContent = t ? `距打车报销 ${t}` : '打车可报销';
   const slacking = live.filter((a) => a.status === 'slacking').length;
-  $('caption').textContent = SHOW_CAPTION ? caption(working, slacking) : '';
+  $('caption').textContent = SHOW_CAPTION ? caption(working, slacking, Boolean(s?.scold)) : '';
 }
 net.on(tick);
 setInterval(tick, 10000);

@@ -1,6 +1,6 @@
 // idle: the session is done and waiting for you; slacking: a resident with no session at all
 export type Status = 'thinking' | 'working' | 'waiting' | 'idle' | 'slacking' | 'leaving' | 'gone';
-export type Activity = 'phone' | 'chat' | 'cat' | 'coffee';
+export type Activity = 'phone' | 'chat' | 'cat' | 'coffee' | 'fake'; // fake: pretending to work while the boss is out
 
 export interface Agent {
   id: string;
@@ -45,6 +45,7 @@ export interface Stats {
   prompts: number;
   failures: number;
   slack: number; // ms the residents spent slacking
+  scoldings: number;
   since: number;
 }
 
@@ -61,7 +62,15 @@ export interface State {
   stats: Stats;
   feed: FeedItem[];
   approvals: { enabled: boolean; active: boolean };
+  scold: Scold | null; // 瓜老板 is out on the floor giving a speech
   now: number;
+}
+
+export interface Scold {
+  id: string;
+  startedAt: number;
+  until: number;
+  lines: string[];
 }
 
 export type XY = [number, number];

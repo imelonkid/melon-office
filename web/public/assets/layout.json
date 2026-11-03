@@ -30,7 +30,9 @@
     "talk1",
     "talk2",
     "pet1",
-    "pet2"
+    "pet2",
+    "scold1",
+    "scold2"
   ],
   "seats": [
     {

@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import type { Agent, Layout, Pending, State, XY } from './types';
+import type { Agent, Layout, Pending, Scold, State, XY } from './types';
 import { net } from './net';
 import { askOf, lineOf, rawOf } from './copy';
 
@@ -23,7 +23,7 @@ const BOSS_LINES = [
   '这个需求，我们拉通对齐一下', '今天的抓手是什么？', 'Q4 要打出组合拳', '大家辛苦了，再冲一下', '把颗粒度再细一点',
 ];
 
-type Variant = 'say' | 'term' | 'ask';
+type Variant = 'say' | 'term' | 'ask' | 'angry';
 
 // ---------------------------------------------------------------- speech bubble
 class Bubble extends Phaser.GameObjects.Container {
@@ -50,7 +50,7 @@ class Bubble extends Phaser.GameObjects.Container {
 
     const chip = s.add.text(0, 0, name, { fontFamily: FONT, fontSize: '21px', fontStyle: 'bold', color: chipFg, backgroundColor: chipBg, padding: { x: 11, y: 5 } });
     const msg = s.add.text(0, 0, text, {
-      fontFamily: FONT, fontSize: '25px', fontStyle: variant === 'ask' ? 'bold' : 'normal',
+      fontFamily: FONT, fontSize: '25px', fontStyle: variant === 'ask' || variant === 'angry' ? 'bold' : 'normal',
       color: term ? '#F5F2FF' : '#2A2440', wordWrap: { width: 520, useAdvancedWrap: true },
     });
     const row1H = Math.max(chip.height, msg.height);
@@ -100,6 +100,7 @@ class Bubble extends Phaser.GameObjects.Container {
     g.fillTriangle(-13, -tail - 1, 13, -tail - 1, 0, 0);
     if (term) g.lineStyle(4, 0x6fe39a, 1).strokeRoundedRect(-w / 2, top, w, h, 22);
     if (variant === 'ask') g.lineStyle(5, 0xffd27a, 1).strokeRoundedRect(-w / 2, top, w, h, 22);
+    if (variant === 'angry') g.lineStyle(5, 0xff6b5e, 1).strokeRoundedRect(-w / 2, top, w, h, 22);
     this.add(g);
 
     let x = -w / 2 + pad;
@@ -187,6 +188,7 @@ class Worker {
     if (a.status === 'leaving') want = 'exit';
     else if (a.status === 'slacking') {
       if (a.activity === 'chat' || a.activity === 'cat') want = a.activity;
+      else if (a.activity === 'fake') want = this.seat() ? 'seat' : 'pantry';
       else want = a.activity === 'phone' && this.seat() ? 'seat' : 'pantry';
     } else if (!this.seat()) want = 'pantry';
     else if (a.status === 'idle') want = this.place === 'pantry' || performance.now() - this.idleSince > 5000 ? 'pantry' : 'seat';
@@ -282,21 +284,21 @@ class Worker {
       const s = this.seat();
       if (!s) return;
       this.sprite.setPosition(s.anchor[0], s.anchor[1]).setDepth(s.row === 'row1' ? 10 : 30);
-      if (a.status === 'slacking') {
+      if (a.status === 'slacking' && a.activity !== 'fake') {
         this.glow.setVisible(false);
         this.sprite.play(`${k}-phone`, true);
         return;
       }
-      const color = GLOW[a.status === 'waiting' ? 'wait' : a.kind] ?? GLOW.other;
+      const color = a.activity === 'fake' ? GLOW.other : GLOW[a.status === 'waiting' ? 'wait' : a.kind] ?? GLOW.other;
       this.glow.setPosition(s.anchor[0], s.anchor[1] - 80).setDepth(this.sprite.depth - 0.5).setFillStyle(color, 0.22).setVisible(true);
       if (a.status === 'waiting') this.sprite.play(`${k}-raise`, true);
-      else if (a.status === 'working' && a.kind !== 'fail') this.sprite.play(`${k}-type`, true);
+      else if ((a.status === 'working' && a.kind !== 'fail') || a.activity === 'fake') this.sprite.play(`${k}-type`, true);
       else this.sprite.play(`${k}-think`, true);
     } else {
       this.glow.setVisible(false);
       const [x, y] = this.scene.project(this.pos.x, this.pos.y);
       this.sprite.setPosition(x, y).setDepth(this.scene.depthFor(this.pos.x, this.pos.y));
-      const anim = this.place === 'chat' ? 'talk' : this.place === 'cat' ? 'pet' : a.status === 'waiting' ? 'stand' : 'mug';
+      const anim = this.place === 'chat' ? 'talk' : this.place === 'cat' ? 'pet' : a.status === 'waiting' || a.activity === 'fake' ? 'stand' : 'mug';
       this.sprite.play(`${k}-${anim}`, true);
     }
   }
@@ -334,6 +336,14 @@ export class OfficeScene extends Phaser.Scene {
   bossBubble!: Bubble;
   boss!: Phaser.GameObjects.Sprite;
   bossLine = BOSS_LINES[0];
+  // the boss walks out to the floor for a speech and back to the meeting room after
+  bossPos: XY = [0, 0];
+  bossPath: XY[] = [];
+  bossGoal: 'room' | 'floor' = 'room';
+  bossLastStep = 0;
+  bossLastSx = 0;
+  scold: Scold | null = null;
+  clockSkew = 0; // server time - local time
   wallTex!: Phaser.Textures.CanvasTexture;
 
   constructor() {
@@ -427,6 +437,7 @@ export class OfficeScene extends Phaser.Scene {
       this.anims.create({ key: `${k}-phone`, frames: fr(['sit_phone', 'sit_phone', 'sit_phone', 'sit_phone2']), frameRate: 2, repeat: -1 });
       this.anims.create({ key: `${k}-talk`, frames: fr(['talk1', 'talk2', 'talk1', 'talk2', 'talk1', 'talk1']), frameRate: 4, repeat: -1 });
       this.anims.create({ key: `${k}-pet`, frames: fr(['pet1', 'pet2']), frameRate: 2, repeat: -1 });
+      this.anims.create({ key: `${k}-scold`, frames: fr(['scold1', 'scold2', 'scold1', 'scold2', 'scold2', 'scold1']), frameRate: 4, repeat: -1 });
     }
 
     this.wallTex = this.textures.createCanvas('walltext', this.layout.size[0], this.layout.size[1])!;
@@ -435,7 +446,8 @@ export class OfficeScene extends Phaser.Scene {
     this.time.addEvent({ delay: 20000, loop: true, callback: () => this.drawWall() });
 
     // 瓜老板 = you. He lives in the meeting room and nags when something needs your approval.
-    const [bx, by] = this.project(...this.layout.spots.boss);
+    this.bossPos = [...this.layout.spots.boss];
+    const [bx, by] = this.project(...this.bossPos);
     this.boss = this.add.sprite(bx, by, 'boss', this.frame('stand')).setOrigin(0.5, 0.9).setDepth(60);
     this.boss.play('boss-stand');
     this.bossBubble = new Bubble(this);
@@ -480,6 +492,9 @@ export class OfficeScene extends Phaser.Scene {
   }
 
   applyState(s: State) {
+    this.scold = s.scold;
+    this.clockSkew = s.now - Date.now();
+    this.walkBoss(s.scold ? 'floor' : 'room');
     this.pendingByAgent = new Map(s.pending.map((p) => [p.agentId, p]));
     const first = !this.seenFirstState;
     const alive = new Set<string>();
@@ -499,12 +514,58 @@ export class OfficeScene extends Phaser.Scene {
     this.seenFirstState = true;
   }
 
+  // meeting room -> through the glass door -> the aisle between the two rows of desks
+  private walkBoss(goal: 'room' | 'floor') {
+    if (goal === this.bossGoal) return;
+    this.bossGoal = goal;
+    const route: XY[] = [[9.3, 3.5], [9.3, 3.0], [8.6, 3.0], [8.6, 3.75], [5.2, 3.75]];
+    const [rx, ry] = this.layout.spots.boss;
+    this.bossPath = goal === 'floor' ? route : [...route.slice(0, -1).reverse(), [rx, 3.5], [rx, ry]];
+    this.bossLastStep = performance.now();
+    this.boss.play('boss-walk', true);
+  }
+
+  private stepBoss() {
+    const now = performance.now();
+    let budget = (Math.min(250, now - this.bossLastStep) / 1000) * SPEED;
+    this.bossLastStep = now;
+    while (budget > 0 && this.bossPath.length) {
+      const [tx, ty] = this.bossPath[0];
+      const d = Math.hypot(tx - this.bossPos[0], ty - this.bossPos[1]);
+      if (d <= budget) {
+        this.bossPos = [tx, ty];
+        budget -= d;
+        this.bossPath.shift();
+      } else {
+        this.bossPos = [this.bossPos[0] + ((tx - this.bossPos[0]) / d) * budget, this.bossPos[1] + ((ty - this.bossPos[1]) / d) * budget];
+        budget = 0;
+      }
+    }
+    const [x, y] = this.project(...this.bossPos);
+    if (Math.abs(x - this.bossLastSx) > 0.5) this.boss.setFlipX(x < this.bossLastSx);
+    this.bossLastSx = x;
+    this.boss.setPosition(x, y).setDepth(this.depthFor(...this.bossPos));
+    if (!this.bossPath.length) {
+      this.boss.setFlipX(false);
+      this.boss.play(this.bossGoal === 'floor' ? 'boss-scold' : 'boss-stand', true);
+    }
+  }
+
   update(time: number) {
     for (const w of this.workers.values()) w.tick(time, this.pendingByAgent.get(w.agent.id));
+    if (this.bossPath.length) this.stepBoss();
     const holding = [...this.pendingByAgent.values()].filter((p) => p.holding).length;
-    const line = holding ? `有 ${holding} 个审批等你，点「同意」就行` : this.bossLine;
-    this.bossBubble.setPosition(this.boss.x, this.boss.y - 150 - 4 * Math.sin(time / 500));
-    this.bossBubble.show('瓜老板（你）', 'boss', line, 'say');
+    let line = holding ? `有 ${holding} 个审批等你，点「同意」就行` : this.bossLine;
+    let variant: Variant = 'say';
+    let shake = 0;
+    if (this.scold) {
+      const half = (this.scold.until - this.scold.startedAt) / 2;
+      line = this.scold.lines[Date.now() + this.clockSkew - this.scold.startedAt < half ? 0 : 1] || this.scold.lines[0];
+      variant = 'angry';
+      shake = this.bossPath.length ? 0 : 3 * Math.sin(time / 25);
+    }
+    this.bossBubble.setPosition(this.boss.x + shake, this.boss.y - 150 - 4 * Math.sin(time / 500));
+    this.bossBubble.show('瓜老板（你）', 'boss', line, variant);
     this.unstack();
   }
 
