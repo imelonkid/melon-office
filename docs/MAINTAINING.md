@@ -26,8 +26,8 @@
 | `.melon-baseline`、`CLAUDE.md`（边界）、本文档 | ✓ |
 | PR 检查：`.github/workflows/ci.yml` → melon-ci `pr-check@v2`，跑 `scripts/ci-test.sh` | ✓ |
 | 单测：hooks 的安装 / 移除 / 状态（`test/`） | ✓ |
-| 打包钩子 `scripts/package-desktop.sh`、发布脚本 `scripts/release-desktop.sh`、发布表单 `release-desktop.yml` | 待做 |
-| 客户端检查更新（读 `latest.json`） | 待做 |
+| 打包钩子 `scripts/package-desktop.sh`（调 `mac/build.sh`）、产物检查 `scripts/verify-build.sh`、发布脚本 `scripts/release-desktop.sh` + `lib-release.sh`、发布表单 `release-desktop.yml`（`manifest: oss`、`runner: macos-26`、`sign: true`） | ✓ |
+| 客户端检查更新（`mac/Sources/MelonOffice/Updater.swift`：启动 10 秒后、每 6 小时、唤醒后读 `latest.json`；本机开发版不查） | ✓ |
 | 启动时对账 Claude Code hooks（缺了问、旧了修、拒绝过不再弹；`hooks-config.mjs` 的 `check()` / `repair()`，Mac 版与 `melon-office start` 共用） | ✓ |
 | GitHub 设置（`github-apply.sh --kind desktop`）、production 环境 | 待做 |
 | 对象存储下载站前缀、只写子账号 | 待做 |
@@ -37,9 +37,17 @@
 
 接入发布流水线之前，Mac 版只能本机 `npm run mac` 构建（`NOTARY_PROFILE=<钥匙串配置> npm run mac` 同时公证），不对外分发安装包。
 
-接入之后：门户应用页点「发布」→ melon-ci 门禁（发布窗口、main 的 CI 全绿）→ 打 `vX.Y.Z` → macOS 构建机打包、Developer ID 签名、公证 → 先传 dmg、最后传 `latest.json` → GitHub Release。回滚：把下载站的 `latest.json` 指回上一版（已装的客户端不会自动降级，只影响新下载与更新提示）。
+发布：门户应用页点「发布」（GitHub Actions「发布」表单兜底）→ melon-ci 门禁（发布窗口、main 的 CI 全绿）→ 打 `vX.Y.Z` → macOS 26 构建机跑 `scripts/release-desktop.sh build`（`package-desktop.sh` → `mac/build.sh`，版本号注入 `Info.plist`，`verify-build.sh` 检查产物）→ 流水线签 dmg、公证、钉票据 → `publish`：先传 `MelonOffice-<版本>-universal.dmg`、最后传 `latest.json`（`files` / `sha256` 的 `arm64`、`x86_64` 都指向这个 universal 安装包）→ GitHub Release。
 
-## GitHub production 环境（接入发布后）
+| 项 | 值 |
+|---|---|
+| 下载站 | `https://melon-download.oss-cn-beijing.aliyuncs.com/melon-office/desktop/`（写死在 `Updater.swift` 与 `release-desktop.sh` 的 `OSS_PREFIX`） |
+| 本机试打包 | 提交后打一个只在本地的 tag（如 `git tag v9.9.9`），`scripts/release-desktop.sh build v9.9.9 <目录>`，用完 `git tag -d v9.9.9`；不签名（ad-hoc），不上传 |
+| 版本号 | tag 为准；`package.json` 的 `version` 给命令行版显示用，发版后顺手改成同一个版本 |
+
+回滚：装到用户电脑上就收不回来，客户端只提示更新的版本。新版有问题 → 修好后发 patch；要让新下载先回到旧版，把旧版的 `latest.json`（GitHub Release 里有 dmg）重新传上去。
+
+## GitHub production 环境
 
 | 名称 | 类型 | 用途 |
 |---|---|---|
@@ -65,3 +73,11 @@
 | 已接入用户升级 | `melon-office init --port 8123`（模拟旧配置） | 打开 App 不弹窗，收到「已更新 Claude Code 接入」通知；`status` 不再提示过期 |
 | 拒绝过的用户 | 弹窗点「以后再说」，或菜单里移除 | 再次打开不弹窗；菜单显示「接入 Claude Code（未接入）」 |
 | 命令行版装过 | `melon-office init --no-approvals` | 打开 App 不弹窗、不改配置（已是当前版本），审批仍走终端 |
+
+## 平台侧（发第一个版本前，由仓库所有者做）
+
+1. GitHub 设置：`github-apply.sh imelonkid/melon-office --kind desktop`（合并方式、main 分支保护、production 环境只允许 main）
+2. 对象存储：`melon-download` 桶给 `melon-office/desktop/*` 开匿名只读；建子账号，策略按基线模板 `oss-ram-policy.json`（只能写这个前缀、不能删）
+3. production 环境：上表的变量与 Secret（签名证书与公证密钥可与其他 App 共用同一份，Secret 按仓库各设一份）；`OSS_BUCKET=melon-download OSS_ENDPOINT=oss-cn-beijing.aliyuncs.com OSS_ACCESS_KEY_ID=… OSS_ACCESS_KEY_SECRET=… scripts/release-desktop.sh oss-test` 先验证能写、公网能读
+4. 门户：运维仓库 `portal/config.json` 加一条（基线模板 `portal-service.json`，`pipelines.release.use: desktop-release`，`online` 读上面的 `latest.json`，`paths` 写 `mac/`、`server/`、`web/`、`scripts/`，`"auto_release": false`），`portal/push.sh`；门户令牌的仓库范围加上本仓库
+5. melon-ci：`v2` tag 目前还没包含「钉公证票据失败时重试」（main 上已合并），签名发布偶尔会因苹果 CloudKit 断连失败；挪 `v2` 之前遇到了就重跑

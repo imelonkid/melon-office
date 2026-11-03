@@ -8,6 +8,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var core: MelonCore!
     private var server: OfficeServer!
     private let notifier = Notifier()
+    private let updater = Updater()
     private let store = OfficeStore()
     private var statusItem: NSStatusItem!
     private var office: OfficeWindow?
@@ -50,6 +51,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         notifier.setUp()
 
         core.start(staff: staff)
+        updater.start() // 启动 10 秒后、之后每 6 小时、唤醒后读 latest.json（本机开发版不查）
         server.start { [weak self] err in
             guard let self else { return }
             self.problem = err
@@ -113,6 +115,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             item.submenu = sub
             menu.addItem(item)
         }
+        if let rel = updater.available {
+            menu.addItem(action("有新版本 \(rel.tag)，点这里更新", #selector(showUpdate)))
+        }
         menu.addItem(.separator())
         menu.addItem(action("打开工区", #selector(openOffice), key: "o"))
         menu.addItem(action("桌面小窗", #selector(toggleWidget), on: widget?.isVisible == true))
@@ -136,6 +141,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.addItem(action(hooked ? "接入 Claude Code" : "接入 Claude Code（未接入）", #selector(toggleHooks), on: hooked))
         menu.addItem(action("开机自启", #selector(toggleLogin), on: SMAppService.mainApp.status == .enabled))
         menu.addItem(action("设置…", #selector(openSettings), key: ","))
+        menu.addItem(action("检查更新…（当前 v\(updater.currentVersion)）", #selector(checkForUpdates)))
         menu.addItem(.separator())
         menu.addItem(action("退出 Melon Office", #selector(quit), key: "q"))
     }
@@ -256,6 +262,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         a.addButton(withTitle: "以后再说")
         NSApp.activate(ignoringOtherApps: true)
         if a.runModal() == .alertFirstButtonReturn { installHooks() }
+    }
+
+    @objc private func showUpdate() {
+        updater.prompt()
+    }
+
+    @objc private func checkForUpdates() {
+        updater.check(manual: true)
     }
 
     @objc private func toggleLogin() {

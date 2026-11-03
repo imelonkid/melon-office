@@ -108,6 +108,10 @@ A native macOS version lives in [`mac/`](mac): a menu bar app that runs the offi
 - **Native rendering**: the office is drawn with SpriteKit and the OA panel with SwiftUI, from the same art as the web version.
 - **Same brain**: `server/office.mjs`, `translate.mjs` and `hooks-config.mjs` run inside JavaScriptCore, and the app serves the same hook endpoints on port 7777, so the hooks and the browser version work unchanged. Don't run the CLI and the app at the same time.
 
+- **Updates**: the app checks for a new version in the background and offers the download (检查更新… in the menu checks right away).
+
+Download the signed and notarized `.dmg` from [the latest release](https://github.com/imelonkid/melon-office/releases/latest), open it and drag Melon Office into Applications. Or build it yourself:
+
 ```bash
 npm run mac        # → mac/build/Melon Office.app (universal, signed with your Developer ID)
 NOTARY_PROFILE=<keychain profile> npm run mac   # also notarize and staple

@@ -8,6 +8,7 @@ echo "▸ 安装依赖"
 npm ci --no-fund --no-audit --loglevel=error
 echo "▸ 语法检查"
 for f in bin/*.mjs server/*.mjs mac/core/*.mjs; do node --check "$f"; done
+for f in scripts/*.sh mac/build.sh install.sh; do bash -n "$f"; done
 echo "▸ 类型检查"
 npm run --silent typecheck
 echo "▸ 构建网页版"
