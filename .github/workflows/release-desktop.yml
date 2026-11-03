@@ -1,0 +1,35 @@
+# 发布 Mac 版（项目基线 · 桌面应用）：平时在内网门户的应用页上点「发布」；这里是兜底表单（Actions →「发布」→ Run workflow）。
+# 门禁（08–23 点、main 的 CI 全绿）→ 打 tag vX.Y.Z → macOS 构建（scripts/package-desktop.sh → mac/build.sh）→ 签名公证 dmg
+# → 安装包与版本清单上传对象存储 → GitHub Release 存档。已安装的 App 读版本清单提示新版本。
+# 流水线本体在 imelonkid/melon-ci（desktop-release，manifest: oss）。命令行版走 git 安装，不经过这里。
+name: 发布
+run-name: "发布 · ${{ inputs.bump }}${{ inputs.emergency && ' · 紧急变更' || '' }}"
+concurrency:
+  group: ${{ github.repository }}-desktop-release
+  cancel-in-progress: false
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: 版本号怎么升
+        type: choice
+        options: [patch, minor, major]
+        default: patch
+      emergency:
+        description: 紧急变更（允许 08–23 点之外发布，24 小时内补复盘）
+        type: boolean
+        default: false
+jobs:
+  release:
+    permissions: { contents: write, checks: read }   # 打 tag、查 CI、建 Release
+    uses: imelonkid/melon-ci/.github/workflows/desktop-release.yml@v2
+    with:
+      tag-prefix: v
+      manifest: oss                                   # 没有服务端：版本清单也放对象存储
+      bump: ${{ inputs.bump }}
+      emergency: ${{ inputs.emergency }}
+      node-version: "22"                              # 网页版构建（Vite）与 JavaScriptCore 核心打包
+      runner: macos-26                                # 原生 App：SDK 要与用户在用的 macOS 同代，否则按旧外观运行
+      sign: true                                      # Developer ID 签名 + 公证；production 环境要 MACOS_CERT_P12_BASE64、
+                                                      # MACOS_CERT_P12_PASSWORD、NOTARY_KEY_P8_BASE64、NOTARY_KEY_ID、NOTARY_ISSUER_ID
+    secrets: inherit

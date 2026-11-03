@@ -112,6 +112,10 @@ Claude Code 会话 ──hooks──▶ 本地桥接服务 127.0.0.1:7777 ──
 - **原生渲染**：工区用 SpriteKit 画，OA 工作台用 SwiftUI，美术和网页版是同一套。
 - **同一个大脑**：`server/office.mjs`、`translate.mjs`、`hooks-config.mjs` 跑在 JavaScriptCore 里，App 在 7777 端口提供同样的 hook 接口，hooks 和浏览器版都不用改。命令行版和 App 不要同时开。
 
+- **检查更新**：后台自动检查新版本并提示下载，菜单里的「检查更新…」可以马上查一次。
+
+到[最新发布](https://github.com/imelonkid/melon-office/releases/latest)下载已签名、公证的 `.dmg`，打开后把 Melon Office 拖进「应用程序」。也可以自己构建：
+
 ```bash
 npm run mac        # → mac/build/Melon Office.app（universal，用你的 Developer ID 签名）
 NOTARY_PROFILE=<钥匙串里的公证配置> npm run mac   # 顺便公证并 staple

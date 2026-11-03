@@ -8,14 +8,17 @@
 # Options (environment variables):
 #   MELON_SIGN_IDENTITY=<name|hash>   signing identity; "-" signs ad hoc (only runs on this Mac)
 #   MELON_SWIFT_BUILD=<dir>           SwiftPM build directory (default mac/.build)
+#   MELON_VERSION=<X.Y.Z>             CFBundleShortVersionString (default: package.json version)
+#   MELON_BUILD=<tag>                 CFBundleVersion (default: commit count; releases pass the tag)
+#   MELON_NO_ZIP=1                    skip the zip (scripts/package-desktop.sh makes a dmg instead)
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
 OUT=mac/build
 APP="$OUT/Melon Office.app"
 SWIFT_BUILD="${MELON_SWIFT_BUILD:-mac/.build}"
-VERSION="$(node -p "require('./package.json').version")"
-BUILD="$(git rev-list --count HEAD 2>/dev/null || echo 1)"
+VERSION="${MELON_VERSION:-$(node -p "require('./package.json').version")}"
+BUILD="${MELON_BUILD:-dev-$(git rev-list --count HEAD 2>/dev/null || echo 0)}"   # dev-…: local builds don't check for updates
 IDENTITY="${MELON_SIGN_IDENTITY:-$(security find-identity -v -p codesigning | grep -m1 'Developer ID Application' | sed -E 's/.*"(.*)"/\1/' || true)}"
 IDENTITY="${IDENTITY:--}"
 
@@ -41,7 +44,8 @@ cp -R web/public/assets "$APP/Contents/Resources/assets"   # art for the native 
 cp -R dist "$APP/Contents/Resources/dist"                   # web version, for 「在浏览器中打开」
 
 step "签名（${IDENTITY}）"
-codesign --force --options runtime --timestamp --entitlements mac/MelonOffice.entitlements --sign "$IDENTITY" "$APP"
+TIMESTAMP=(--timestamp); [ "$IDENTITY" = "-" ] && TIMESTAMP=()   # ad hoc signatures can't be timestamped
+codesign --force --options runtime "${TIMESTAMP[@]+"${TIMESTAMP[@]}"}" --entitlements mac/MelonOffice.entitlements --sign "$IDENTITY" "$APP"
 codesign --verify --strict --verbose=1 "$APP"
 
 if [ -n "${NOTARY_PROFILE:-}" ]; then
@@ -52,5 +56,6 @@ if [ -n "${NOTARY_PROFILE:-}" ]; then
   rm "$OUT/MelonOffice-notarize.zip"
 fi
 
+if [ -n "${MELON_NO_ZIP:-}" ]; then printf '\n\033[32m✓ %s\033[0m\n' "$APP"; exit 0; fi
 ditto -c -k --keepParent "$APP" "$OUT/MelonOffice-$VERSION.zip"
 printf '\n\033[32m✓ %s\033[0m\n  %s\n' "$APP" "$OUT/MelonOffice-$VERSION.zip"
