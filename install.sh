@@ -79,7 +79,7 @@ if [ "${NEED_PATH:-}" = "1" ]; then
   if ! grep -qs 'melon-office: add ~/.local/bin' "$SHELL_RC"; then
     printf '\n# melon-office: add ~/.local/bin to PATH\nexport PATH="$HOME/.local/bin:$PATH"\n' >> "$SHELL_RC"
   fi
-  gray "  已把 ~/.local/bin 加入 PATH（$SHELL_RC），新开的终端里生效"
+  gray "  已把 ~/.local/bin 加入 PATH（${SHELL_RC}），新开的终端里生效"
 fi
 
 # ---------------------------------------------------------------- hooks

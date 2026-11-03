@@ -5,3 +5,14 @@ dist/
 __pycache__/
 mac/.build/
 mac/build/
+
+# 密钥与数据不进 git（项目基线）
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.db
+*.sqlite
+*.bak

@@ -42,6 +42,7 @@
     "start": "node bin/melon-office.mjs start",
     "demo": "node bin/melon-office.mjs demo",
     "typecheck": "tsc --noEmit",
+    "test": "node --test test/*.test.mjs",
     "assets": "python3 tools/render_assets.py",
     "setup": "npm install && npm run build && node bin/melon-office.mjs init && node bin/melon-office.mjs start",
     "mac": "bash mac/build.sh"
