@@ -1,7 +1,7 @@
-// The OA 工作台 on the right: approvals, who is working, who is slacking, and the auto daily report.
+// The OA 工作台 on the right: approvals, who is working, who is slacking, the daily report, and settings.
 import type { Agent, State } from './types';
 import { net } from './net';
-import { ACTIVITY, RECORD, askOf, dailyReport, lineOf, projectOf, rawOf, since } from './copy';
+import { ACTIVITY, RECORD, askOf, lineOf, projectOf, rawOf, since } from './copy';
 
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!));
 const KIND_CLASS: Record<string, string> = { edit: 'k-edit', read: 'k-read', search: 'k-read', bash: 'k-bash', web: 'k-web', fail: 'k-fail' };
@@ -26,23 +26,85 @@ function card(a: Agent, now: number, right: string, sub: string, cls = '') {
 
 export function mountPanel(el: HTMLElement) {
   let reportOpen = false;
+  let reportFile = '';
+  let reportError = '';
   let last: State | undefined;
+
+  // the head and the settings form stay put; only the body below them is re-rendered,
+  // so typing in the form isn't wiped by state updates
+  el.innerHTML = `
+    <div class="panel-head">
+      <div class="panel-title">OA 工作台</div>
+      <div class="head-right">
+        <label class="switch" title="开启后，工区里可以直接同意/驳回 Claude 的权限请求">
+          <input id="approvals" type="checkbox" checked>
+          <span>在工区审批</span>
+        </label>
+        <button class="gear" data-settings title="设置" aria-label="设置">⚙</button>
+      </div>
+    </div>
+    <form class="settings" hidden>
+      <label>工区名称<input name="officeName" maxlength="40" placeholder="甜瓜科技 · AI 事业部"></label>
+      <label>日报保存目录<input name="reportDir" placeholder="~/Documents/Melon Office 日报"></label>
+      <div class="settings-foot"><span class="muted" data-settings-note>保存在 ~/.config/melon-office/settings.json</span><button type="submit">保存</button></div>
+    </form>
+    <div class="panel-body"></div>`;
+  const approvalsBox = el.querySelector<HTMLInputElement>('#approvals')!;
+  const form = el.querySelector<HTMLFormElement>('.settings')!;
+  const body = el.querySelector<HTMLElement>('.panel-body')!;
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const field = (name: string) => (form.elements.namedItem(name) as HTMLInputElement).value;
+    const data = { officeName: field('officeName'), reportDir: field('reportDir') };
+    const note = form.querySelector<HTMLElement>('[data-settings-note]')!;
+    try {
+      await net.api('/api/settings', data);
+      note.textContent = '已保存';
+      setTimeout(() => { form.hidden = true; }, 600);
+    } catch {
+      note.textContent = '保存失败，工区服务连上了吗？';
+    }
+  });
+
+  async function makeReport() {
+    try {
+      const r = await net.api<{ file: string }>('/api/report');
+      reportFile = r.file;
+      reportError = '';
+    } catch {
+      reportError = 'HTML 没存上，检查一下日报保存目录';
+    }
+    reportOpen = true;
+    if (last) render(last);
+  }
 
   let lastHtml = '';
   // pointerdown, not click: the panel re-renders often and a click can land on a replaced button
   el.addEventListener('pointerdown', (e) => {
-    const btn = (e.target as HTMLElement).closest<HTMLElement>('[data-decide]');
-    if (!btn) return;
-    net.decide(btn.dataset.id!, btn.dataset.decide as 'allow' | 'deny');
-    btn.closest('.card')?.classList.add('done');
+    const t = e.target as HTMLElement;
+    const btn = t.closest<HTMLElement>('[data-decide]');
+    if (btn) {
+      net.decide(btn.dataset.id!, btn.dataset.decide as 'allow' | 'deny');
+      btn.closest('.card')?.classList.add('done');
+    }
+    if (t.closest('[data-report]')) makeReport();
+    if (t.closest('[data-open-report]')) net.api('/api/report/open').catch(() => {});
+    if (t.closest('[data-copy]')) {
+      const text = el.querySelector('.report-text')?.textContent || '';
+      navigator.clipboard?.writeText(`${text}\n— ${last?.settings.officeName ?? ''} · 来自 Melon Office`);
+      (t.closest('[data-copy]') as HTMLElement).textContent = '已复制';
+    }
   });
   el.addEventListener('click', (e) => {
     const t = e.target as HTMLElement;
-    if (t.closest('[data-report]')) { reportOpen = true; if (last) render(last); }
-    if (t.closest('[data-copy]')) {
-      const text = el.querySelector('.report-text')?.textContent || '';
-      navigator.clipboard?.writeText(text + '\n— 来自 Melon Office @melonkid');
-      (t.closest('[data-copy]') as HTMLElement).textContent = '已复制';
+    if (t.closest('[data-settings]')) {
+      form.hidden = !form.hidden;
+      if (!form.hidden && last) {
+        (form.elements.namedItem('officeName') as HTMLInputElement).value = last.settings.officeName;
+        (form.elements.namedItem('reportDir') as HTMLInputElement).value = last.settings.reportDir;
+        form.querySelector<HTMLElement>('[data-settings-note]')!.textContent = '保存在 ~/.config/melon-office/settings.json';
+      }
     }
   });
   el.addEventListener('change', (e) => {
@@ -61,15 +123,9 @@ export function mountPanel(el: HTMLElement) {
     const chill = live.filter((a) => a.status === 'idle' || a.status === 'leaving');
     const slacking = live.filter((a) => a.status === 'slacking');
 
-    const html = `
-      <div class="panel-head">
-        <div class="panel-title">OA 工作台</div>
-        <label class="switch" title="开启后，工区里可以直接同意/驳回 Claude 的权限请求">
-          <input id="approvals" type="checkbox" ${s.approvals.enabled ? 'checked' : ''}>
-          <span>在工区审批</span>
-        </label>
-      </div>
+    approvalsBox.checked = s.approvals.enabled;
 
+    const html = `
       <div class="section warn">待我审批 · ${waiting.length}</div>
       ${waiting.length ? waiting.map(({ p, a }) => `
         <div class="card ask">
@@ -95,15 +151,18 @@ export function mountPanel(el: HTMLElement) {
       <div class="report">
         <div class="report-head"><b>瓜老板的日报</b><span class="muted">自动生成</span></div>
         ${reportOpen
-          ? `<div class="report-text">${esc(dailyReport(s.stats, live.length))}</div>
-             <div class="report-foot"><span class="muted">@melonkid · 甜瓜科技</span><button data-copy>复制分享</button></div>`
+          ? `<div class="report-text">${esc(s.reportText)}</div>
+             ${reportFile ? `<div class="report-file" title="${esc(reportFile)}">已保存：${esc(reportFile)}</div>` : ''}
+             ${reportError ? `<div class="report-file warn">${esc(reportError)}</div>` : ''}
+             <div class="report-foot"><span class="muted">${esc(s.settings.officeName)}</span>
+               <span class="btns">${reportFile ? '<button data-open-report>打开</button>' : ''}<button data-report>更新</button><button data-copy>复制</button></span></div>`
           : `<div class="report-foot"><span class="muted">今日交付 ${s.stats.delivered} 项 · 工具调用 ${s.stats.toolCalls} 次</span><button data-report>生成日报</button></div>`}
       </div>
       ${RECORD ? '<div class="rec-note">录屏模式：已隐藏文件名和命令</div>' : ''}
     `;
     if (html === lastHtml) return;
     lastHtml = html;
-    el.innerHTML = html;
+    body.innerHTML = html;
   }
 
   net.on(render);

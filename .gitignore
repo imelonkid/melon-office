@@ -3,3 +3,5 @@ dist/
 .DS_Store
 *.log
 __pycache__/
+mac/.build/
+mac/build/

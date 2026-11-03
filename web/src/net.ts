@@ -41,6 +41,13 @@ class Net {
     if (this.ws?.readyState === WebSocket.OPEN) this.ws.send(JSON.stringify(msg));
   }
 
+  /** POST to the local office API */
+  async api<T = unknown>(path: string, body: unknown = {}): Promise<T> {
+    const r = await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    if (!r.ok) throw new Error(`${path}: ${r.status}`);
+    return r.json() as Promise<T>;
+  }
+
   decide(id: string, behavior: 'allow' | 'deny') {
     this.send({ type: 'decision', id, behavior });
   }

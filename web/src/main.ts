@@ -31,6 +31,10 @@ function tick() {
   const working = live.filter((a) => a.status === 'working' || a.status === 'thinking' || a.status === 'waiting').length;
   $('headcount').textContent = `${working} / ${live.length}`;
   $('delivered').textContent = String(s?.stats.delivered ?? 0);
+  if (s?.settings) {
+    $('brand-name').textContent = s.settings.officeName;
+    document.title = `Melon Office · ${s.settings.officeName}`;
+  }
   const t = taxiCountdown();
   $('taxi').textContent = t ? `距打车报销 ${t}` : '打车可报销';
   const slacking = live.filter((a) => a.status === 'slacking').length;

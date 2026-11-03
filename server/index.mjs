@@ -5,6 +5,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { WebSocketServer } from 'ws';
+import { spawn } from 'node:child_process';
 import { Office } from './office.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -44,6 +45,11 @@ function localOrigin(req) {
     const h = new URL(o).hostname;
     return h === '127.0.0.1' || h === 'localhost';
   } catch { return false; }
+}
+
+function openFile(file) {
+  const opener = process.platform === 'darwin' ? 'open' : process.platform === 'win32' ? 'explorer' : 'xdg-open';
+  spawn(opener, [file], { stdio: 'ignore', detached: true }).on('error', () => {}).unref();
 }
 
 function serveStatic(req, res) {
@@ -94,6 +100,19 @@ export async function startServer({ port = 7777, host = '127.0.0.1', demo = fals
           const { enabled } = await readBody(req);
           office.approvals.enabled = Boolean(enabled);
           office.changed();
+          return json(res, 200, { ok: true });
+        }
+        if (req.method === 'POST' && pathname === '/api/settings') {
+          const { officeName, reportDir } = await readBody(req);
+          return json(res, 200, { ok: true, settings: office.setSettings({ officeName, reportDir }) });
+        }
+        if (req.method === 'POST' && pathname === '/api/report') {
+          return json(res, 200, { ok: true, file: office.saveReport() });
+        }
+        // opens the last saved report in the default browser (never an arbitrary path from the page)
+        if (req.method === 'POST' && pathname === '/api/report/open') {
+          if (!office.lastReport) return json(res, 404, { error: 'no report yet' });
+          openFile(office.lastReport);
           return json(res, 200, { ok: true });
         }
         return json(res, 404, { error: 'not found' });

@@ -1,6 +1,6 @@
 // Text shown in the office. Record mode (?record) hides file names, commands and project names
 // so a screen recording never leaks what you're working on.
-import type { Agent, Stats } from './types';
+import type { Agent } from './types';
 
 const params = new URLSearchParams(location.search);
 export const RECORD = params.has('record');
@@ -31,17 +31,6 @@ export function since(ts: number, now = Date.now()): string {
 }
 
 export const ACTIVITY: Record<string, string> = { phone: '刷手机', chat: '聊八卦', cat: '撸猫', coffee: '喝咖啡', fake: '假装很忙' };
-
-export function dailyReport(stats: Stats, headcount: number): string {
-  const align = Math.max(1, stats.prompts);
-  const slack = Math.round(stats.slack / 60000);
-  return `今日带领团队交付 ${stats.delivered} 项，调用工具 ${stats.toolCalls} 次，拉通对齐 ${align} 次，` +
-    `过审批 ${stats.approvals} 次，赋能 ${headcount} 位同学` +
-    (stats.failures ? `，复盘翻车 ${stats.failures} 次` : '') +
-    (slack ? `，团队带薪摸鱼 ${slack} 分钟` : '') +
-    (stats.scoldings ? `，开展作风整顿 ${stats.scoldings} 次` : '') +
-    '。明日继续抓手落地，打出组合拳。';
-}
 
 export function caption(working: number, slacking = 0, scolding = false): string {
   if (scolding) return '瓜老板正在工区训话，大家假装很忙';

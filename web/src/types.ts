@@ -63,7 +63,14 @@ export interface State {
   feed: FeedItem[];
   approvals: { enabled: boolean; active: boolean };
   scold: Scold | null; // 瓜老板 is out on the floor giving a speech
+  settings: Settings;
+  reportText: string; // 瓜老板的日报, one paragraph
   now: number;
+}
+
+export interface Settings {
+  officeName: string; // shown top-left, e.g. 甜瓜科技 · AI 事业部
+  reportDir: string;  // where the HTML daily report is saved
 }
 
 export interface Scold {

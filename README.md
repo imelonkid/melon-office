@@ -36,7 +36,8 @@ And it's a lot of fun to watch.
 - **Monitor glow by tool.** Green for editing, blue for reading and searching, orange for shell commands, red when waiting on you.
 - **Approve from the office.** Opt-in. Only when the page is open does the bridge hold a permission request for you (up to ~55 s); otherwise Claude falls back to the normal terminal prompt instantly.
 - **Commands translated to plain words.** Built-in rules for git, npm/pnpm/yarn, test runners, build tools, curl, docker, MCP tools and more. Unknown commands fall back to the description Claude writes for every shell call.
-- **OA dashboard.** Pending approvals, who's working overtime, who's in the pantry, plus an auto-generated "boss's daily report" you can copy and share.
+- **OA dashboard.** Pending approvals, who's working overtime, who's in the pantry, plus an auto-generated "boss's daily report" you can copy and share. Generating it also saves a full HTML report (stats, team, recent activity) as `日报-YYYY-MM-DD.html`, by default in `~/Documents/Melon Office 日报`.
+- **Make it your office.** The ⚙ in the dashboard (or 设置… in the Mac menu bar) sets the company name shown top-left and on reports, and where reports are saved. Settings live in `~/.config/melon-office/settings.json`, shared by the CLI and the Mac app.
 - **Demo mode.** Replays a busy day at the office, so you can record a video without running real work.
 - **Isometric art, generated in code.** Every pixel comes from `tools/render_assets.py`. Change colours, furniture or characters and re-render.
 
@@ -94,6 +95,23 @@ Claude Code sessions ──hooks──▶ local bridge 127.0.0.1:7777 ──WebS
 - Passive events (`SessionStart`, `PreToolUse`, `Stop`, `SubagentStart`, …) are sent by an `async` command hook with `curl`. They never slow Claude down and fail silently when the office is closed.
 - `PermissionRequest` uses an `http` hook, so the office can answer with allow or deny.
 - The bridge only listens on `127.0.0.1`, and the approval API and WebSocket only accept pages served from your machine. Hook payloads contain your code and commands, so don't expose the port to your network.
+
+## Mac app
+
+A native macOS version lives in [`mac/`](mac): a menu bar app that runs the office without Node or a browser.
+
+- **Menu bar**: 🍈 shows how many employees are working and how many approvals are waiting; approve or deny right from the menu.
+- **Approval notifications**: requests show up as macOS notifications with 同意 / 驳回 buttons, so the office can hold them even with no window open.
+- **Desk widget**: an always-on-top, transparent mini office for a corner of your screen. Clicks pass through the empty corners.
+- **Native rendering**: the office is drawn with SpriteKit and the OA panel with SwiftUI, from the same art as the web version.
+- **Same brain**: `server/office.mjs`, `translate.mjs` and `hooks-config.mjs` run inside JavaScriptCore, and the app serves the same hook endpoints on port 7777, so the hooks and the browser version work unchanged. Don't run the CLI and the app at the same time.
+
+```bash
+npm run mac        # → mac/build/Melon Office.app (universal, signed with your Developer ID)
+NOTARY_PROFILE=<keychain profile> npm run mac   # also notarize and staple
+```
+
+Needs Xcode 15+ and macOS 13+.
 
 ## Development
 

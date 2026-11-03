@@ -2,6 +2,8 @@
 import { EventEmitter } from 'node:events';
 import path from 'node:path';
 import { humanize } from './translate.mjs';
+import { loadSettings, saveSettings } from './settings.mjs';
+import { reportText, saveReport } from './report.mjs';
 
 export const CAST = [
   { key: 'gua', name: '小瓜', role: '前端', level: 'P6' },
@@ -71,11 +73,22 @@ export class Office extends EventEmitter {
     this.scold = null;
     this.lastScold = Date.now() - SCOLD_GAP + 60000; // first speech no sooner than a minute after opening
     this.approvals = { enabled: true, clients: 0 };
+    this.settings = loadSettings();
+    this.lastReport = null;
     this.seq = 0;
     this.hired = { guest: 0, intern: 0, contractor: 0 };
     const n = Math.max(0, Math.min(CAST.length, Math.floor(Number(staff) || 0)));
     CAST.slice(0, n).forEach((c, i) => this.addResident(c, i));
-    setInterval(() => this.shuffleSlack(), 4000).unref();
+    this.ticker = setInterval(() => this.shuffleSlack(), 4000);
+    this.ticker.unref?.();
+  }
+
+  // stop the clock and let every held approval fall back to the terminal (used when the office is rebuilt)
+  dispose() {
+    clearInterval(this.ticker);
+    for (const p of this.pending.values()) { clearTimeout(p.timer); p.resolve(null); }
+    this.pending.clear();
+    this.removeAllListeners();
   }
 
   // ---------- helpers ----------
@@ -222,7 +235,7 @@ export class Office extends EventEmitter {
       this.set(a, { activity: 'fake', partner: null, slackUntil: now + SCOLD_MS + 2000 + Math.random() * 6000, line: pick(FAKE_BUSY) });
     }
     this.feed.unshift({ t: now, agentId: '', name: '瓜老板', text: '在工区训话' });
-    setTimeout(() => this.endScold(), SCOLD_MS).unref();
+    setTimeout(() => this.endScold(), SCOLD_MS).unref?.();
     return true;
   }
 
@@ -387,6 +400,19 @@ export class Office extends EventEmitter {
     return this.approvals.enabled && this.approvals.clients > 0;
   }
 
+  // ---------- settings & daily report ----------
+  setSettings(patch) {
+    this.settings = saveSettings({ ...this.settings, ...patch });
+    this.changed();
+    return this.settings;
+  }
+
+  /** saves the HTML daily report and returns its path */
+  saveReport() {
+    this.lastReport = saveReport({ ...this.snapshot(), feed: this.feed }, this.settings);
+    return this.lastReport;
+  }
+
   slackingNow() {
     const now = Date.now();
     let ms = 0;
@@ -402,6 +428,8 @@ export class Office extends EventEmitter {
       feed: this.feed.slice(0, 12),
       approvals: { enabled: this.approvals.enabled, active: this.canHold() },
       scold: this.scold,
+      settings: this.settings,
+      reportText: reportText(this.stats, [...this.agents.values()].filter((a) => a.status !== 'gone').length),
       now: Date.now(),
     };
   }
