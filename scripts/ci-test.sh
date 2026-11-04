@@ -17,3 +17,7 @@ echo "▸ 打包 Mac 版核心（JavaScriptCore 用）"
 node mac/core/bundle.mjs "$(mktemp -d)/core.js"
 echo "▸ 测试"
 npm test
+if [[ "$(uname -s)" == Darwin ]]; then
+  echo "▸ Mac 原生回归"
+  bash scripts/test-mac.sh
+fi

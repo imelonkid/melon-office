@@ -14,17 +14,13 @@ extension Color {
 /// SKView in SwiftUI (SpriteView doesn't let us keep the scene's own scale mode and mouse handling)
 struct SceneView: NSViewRepresentable {
     let scene: OfficeScene
+    @ObservedObject var store: OfficeStore
 
-    func makeNSView(context: Context) -> SKView {
-        let view = SKView()
-        view.allowsTransparency = true
-        view.ignoresSiblingOrder = true
-        view.preferredFramesPerSecond = 30
-        view.presentScene(scene)
-        return view
+    func makeNSView(context: Context) -> OfficeRenderView {
+        OfficeRenderView(scene: scene)
     }
 
-    func updateNSView(_ view: SKView, context: Context) {}
+    func updateNSView(_ view: OfficeRenderView, context: Context) { view.recoverIfStalled() }
 }
 
 struct OfficeView: View {
@@ -39,7 +35,7 @@ struct OfficeView: View {
             header(s)
             HStack(alignment: .top, spacing: 16) {
                 VStack(spacing: 6) {
-                    SceneView(scene: scene)
+                    SceneView(scene: scene, store: store)
                         .aspectRatio(Assets.shared.size.width / Assets.shared.size.height, contentMode: .fit)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                     Text(Copy.caption(working: s.busy.count, slacking: s.slacking.count, scolding: s.scold != nil))

@@ -33,7 +33,7 @@ final class OfficeWindow: NSWindowController {
 final class WidgetWindow: NSWindowController {
     static let sizes: [(String, CGFloat)] = [("小", 360), ("中", 520), ("大", 720)]
     private var poll: Timer?
-    private var skView: SKView!
+    private var skView: OfficeRenderView!
     private var scene: OfficeScene!
 
     convenience init(store: OfficeStore, width: CGFloat) {
@@ -48,12 +48,8 @@ final class WidgetWindow: NSWindowController {
         panel.isReleasedWhenClosed = false
         panel.isMovableByWindowBackground = true // drag the office around by its floor
 
-        let view = SKView()
-        view.allowsTransparency = true
-        view.ignoresSiblingOrder = true
-        view.preferredFramesPerSecond = 30
         let scene = OfficeScene(store: store, widget: true)
-        view.presentScene(scene)
+        let view = OfficeRenderView(scene: scene)
         panel.contentView = view
         if !panel.setFrameUsingName("widget"), let screen = NSScreen.main?.visibleFrame {
             panel.setFrameOrigin(NSPoint(x: screen.maxX - panel.frame.width - 20, y: screen.minY + 20))
@@ -89,10 +85,12 @@ final class WidgetWindow: NSWindowController {
 
     private func updateClickThrough() {
         guard let w = window else { return }
+        skView.recoverIfStalled()
         let mouse = NSEvent.mouseLocation
         guard w.frame.contains(mouse) else { return }
-        let inView = skView.convert(w.convertPoint(fromScreen: mouse), from: nil)
-        let solid = scene.isSolid(at: skView.convert(inView, to: scene))
+        let renderer = skView.renderer
+        let inView = renderer.convert(w.convertPoint(fromScreen: mouse), from: nil)
+        let solid = scene.isSolid(at: renderer.convert(inView, to: scene))
         if w.ignoresMouseEvents == solid { w.ignoresMouseEvents = !solid }
     }
 }
