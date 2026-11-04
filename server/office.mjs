@@ -5,6 +5,7 @@ import { humanize } from './translate.mjs';
 import { loadSettings, saveSettings } from './settings.mjs';
 import { reportText, saveReport } from './report.mjs';
 import { Memory } from './memory.mjs';
+import { employeeProfile } from './employee-profile.mjs';
 
 export const CAST = [
   { key: 'gua', name: '小瓜', role: '前端', level: 'P6' },
@@ -441,8 +442,9 @@ export class Office extends EventEmitter {
   }
 
   snapshot() {
+    const now = Date.now();
     return {
-      agents: [...this.agents.values()],
+      agents: [...this.agents.values()].map((a) => ({ ...a, profile: employeeProfile(a, this.feed, now) })),
       pending: [...this.pending.values()].map(({ id, agentId, tool, detail, gist, raw, holding }) => ({ id, agentId, tool, detail, gist, raw, holding })),
       stats: { ...this.stats, slack: this.stats.slack + this.slackingNow() },
       feed: this.feed.slice(0, 12),
@@ -450,7 +452,7 @@ export class Office extends EventEmitter {
       scold: this.scold,
       settings: this.settings,
       reportText: reportText(this.stats, [...this.agents.values()].filter((a) => a.status !== 'gone').length),
-      now: Date.now(),
+      now,
     };
   }
 }

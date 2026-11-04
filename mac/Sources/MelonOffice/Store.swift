@@ -1,9 +1,30 @@
 import AppKit
 import Combine
 
+/// Native app preferences; shared office settings still live in the JS core.
+struct DesktopPreferences {
+    var staff = 3
+    var widgetWidth: CGFloat = 520
+    var launchAtLogin = false
+    var claudeState = "none"
+    var problem: String?
+    var version = ""
+
+    var claudeConnected: Bool { claudeState == "current" || claudeState == "stale" }
+}
+
 /// The latest office state plus the few things the UI can do, shared by the window, the widget and the menu.
 final class OfficeStore: ObservableObject {
     @Published private(set) var state = OfficeState()
+    @Published var desktop = DesktopPreferences()
+    @Published var selectedEmployeeId: String?
+    var revealEmployee: () -> Void = {}
+
+    func selectEmployee(_ id: String) {
+        guard state.agent(id) != nil else { return }
+        selectedEmployeeId = id
+        revealEmployee()
+    }
     /// record mode: hide file names, commands and project names for screen recordings
     @Published var record = UserDefaults.standard.bool(forKey: "record") {
         didSet { UserDefaults.standard.set(record, forKey: "record") }
@@ -17,6 +38,12 @@ final class OfficeStore: ObservableObject {
     /// writes the HTML daily report, returns its path (nil if it couldn't be written)
     var saveReport: () -> String? = { nil }
     var openSettings: () -> Void = {}
+    var openInBrowser: () -> Void = {}
+    var setResidentStaff: (Int) -> Void = { _ in }
+    var setWidgetWidth: (CGFloat) -> Void = { _ in }
+    var setClaudeConnected: (Bool) -> Void = { _ in }
+    var setLaunchAtLogin: (Bool) -> Void = { _ in }
+    var setRecord: (Bool) -> Void = { _ in }
 
     func update(json: String) {
         let s = OfficeState(json: json)

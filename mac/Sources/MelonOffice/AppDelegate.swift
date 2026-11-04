@@ -37,6 +37,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             return path
         }
         store.openSettings = { [weak self] in self?.openSettings() }
+        store.openInBrowser = { [weak self] in self?.openInBrowser() }
+        store.setResidentStaff = { [weak self] in self?.setStaff($0) }
+        store.setWidgetWidth = { [weak self] in self?.setWidgetWidth($0) }
+        store.setClaudeConnected = { [weak self] in self?.setClaudeConnected($0) }
+        store.setLaunchAtLogin = { [weak self] in self?.setLaunchAtLogin($0) }
+        store.setRecord = { [weak self] on in
+            guard let self else { return }
+            self.store.record = on
+            self.stateChanged(self.core.snapshot())
+        }
+        store.revealEmployee = { [weak self] in self?.openOffice() }
         server.onSocketsChanged = { [weak self] in self?.updateClients() }
 
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
@@ -62,6 +73,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 if self.defaults.bool(forKey: "widget") { self.toggleWidget() }
                 self.reconcileHooks()
             }
+            self.refreshDesktopSettings()
         }
     }
 
@@ -107,14 +119,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     func menuNeedsUpdate(_ menu: NSMenu) {
         menu.removeAllItems()
         if let problem {
-            menu.addItem(disabled("⚠︎ \(problem)"))
+            let item = action("服务未启动，查看详情…", #selector(openSettings))
+            item.toolTip = problem
+            menu.addItem(item)
         } else {
             menu.addItem(disabled("加班 \(busy) · 摸鱼 \(slacking) · 待审批 \(asks.count)"))
         }
         for ask in asks {
             let id = ask.id
             let who = state.agent(ask.agentId)?.name ?? "员工"
-            let item = NSMenuItem(title: "\(who)想要：\(store.ask(ask))", action: nil, keyEquivalent: "")
+            let detail = store.ask(ask)
+            let summary = detail.count > 30 ? String(detail.prefix(30)) + "…" : detail
+            let item = NSMenuItem(title: "\(who)想要：\(summary)", action: nil, keyEquivalent: "")
+            item.toolTip = detail
             let sub = NSMenu()
             sub.addItem(action("同意", #selector(decide(_:)), represented: [id, "allow"]))
             sub.addItem(action("驳回", #selector(decide(_:)), represented: [id, "deny"]))
@@ -127,27 +144,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.addItem(.separator())
         menu.addItem(action("打开工区", #selector(openOffice), key: "o"))
         menu.addItem(action("桌面小窗", #selector(toggleWidget), on: widget?.isVisible == true))
-        let sizeItem = NSMenuItem(title: "小窗大小", action: nil, keyEquivalent: "")
-        let sizeMenu = NSMenu()
-        for (label, width) in WidgetWindow.sizes {
-            sizeMenu.addItem(action(label, #selector(setWidgetSize(_:)), on: abs(widgetWidth - width) < 1, represented: width))
-        }
-        sizeItem.submenu = sizeMenu
-        menu.addItem(sizeItem)
-        menu.addItem(action("在浏览器中打开", #selector(openInBrowser)))
-        menu.addItem(action("录屏模式（隐藏文件名和命令）", #selector(toggleRecord), on: store.record))
         menu.addItem(.separator())
-        menu.addItem(action("在工区审批", #selector(toggleApprovals), on: approvalsOn))
-        let staffItem = NSMenuItem(title: "常驻员工", action: nil, keyEquivalent: "")
-        let staffMenu = NSMenu()
-        for n in 0...5 { staffMenu.addItem(action(n == 0 ? "不要常驻" : "\(n) 人", #selector(setStaff(_:)), on: n == staff, represented: n)) }
-        staffItem.submenu = staffMenu
-        menu.addItem(staffItem)
-        let hooked = !core.hooksEvents().isEmpty
-        menu.addItem(action(hooked ? "接入 Claude Code" : "接入 Claude Code（未接入）", #selector(toggleHooks), on: hooked))
-        menu.addItem(action("开机自启", #selector(toggleLogin), on: SMAppService.mainApp.status == .enabled))
         menu.addItem(action("设置…", #selector(openSettings), key: ","))
-        menu.addItem(action("检查更新…（当前 v\(updater.currentVersion)）", #selector(checkForUpdates)))
+        menu.addItem(action("检查更新…", #selector(checkForUpdates)))
         menu.addItem(.separator())
         menu.addItem(action("退出 Melon Office", #selector(quit), key: "q"))
     }
@@ -185,18 +184,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         defaults.set(widget.isVisible, forKey: "widget")
     }
 
-    @objc private func setWidgetSize(_ sender: NSMenuItem) {
-        guard let width = sender.representedObject as? CGFloat else { return }
+    private func setWidgetWidth(_ width: CGFloat) {
         defaults.set(width, forKey: "widgetWidth")
         widget?.resize(width: width)
-    }
-
-    @objc private func toggleRecord() {
-        store.record.toggle()
-        stateChanged(core.snapshot()) // re-render bubbles and notifications without names
+        refreshDesktopSettings()
     }
 
     @objc private func openSettings() {
+        refreshDesktopSettings()
         if settings == nil { settings = SettingsWindow(store: store) }
         settings?.show()
     }
@@ -205,29 +200,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         NSWorkspace.shared.open(baseURL)
     }
 
-    @objc private func toggleApprovals() {
-        core.setApprovals(!approvalsOn)
-    }
-
-    @objc private func setStaff(_ sender: NSMenuItem) {
-        guard let n = sender.representedObject as? Int else { return }
+    private func setStaff(_ n: Int) {
         defaults.set(n, forKey: "staff")
         core.start(staff: n) // rebuilds the office; sessions reappear with their next hook event
         updateClients()
+        refreshDesktopSettings()
     }
 
-    @objc private func toggleHooks() {
-        if core.hooksEvents().isEmpty {
+    private func setClaudeConnected(_ connected: Bool) {
+        if connected {
             installHooks()
         } else {
             core.hooksUninstall()
             hooksChoice = "declined" // removed on purpose: don't put them back on the next launch
             alert("已移除 Melon Office 的 hooks", "~/.claude/settings.json 里的其它配置原样保留。")
         }
+        refreshDesktopSettings()
     }
 
     private func installHooks() {
-        let r = core.hooksInstall(port: port, approvals: true)
+        let r = core.hooksInstall(port: port, approvals: approvalsOn)
         hooksChoice = "accepted"
         var info = "写入：\(r["file"] as? String ?? "~/.claude/settings.json")"
         if let backup = r["backup"] as? String { info += "\n原配置已备份：\(backup)" }
@@ -263,7 +255,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         hooksChoice = "declined" // until they click 接入
         let a = NSAlert()
         a.messageText = "接入 Claude Code？"
-        a.informativeText = "Melon Office 会在 ~/.claude/settings.json 里加几条 hooks（先备份原文件），Claude Code 的会话才能走进工区。随时可以在菜单栏里移除。"
+        a.informativeText = "Melon Office 会在 ~/.claude/settings.json 里加几条 hooks（先备份原文件），Claude Code 的会话才能走进工区。随时可以在「设置 → 接入」里关闭。"
         a.addButton(withTitle: "接入")
         a.addButton(withTitle: "以后再说")
         NSApp.activate(ignoringOtherApps: true)
@@ -278,12 +270,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         updater.check(manual: true)
     }
 
-    @objc private func toggleLogin() {
+    private func setLaunchAtLogin(_ enabled: Bool) {
         do {
-            if SMAppService.mainApp.status == .enabled { try SMAppService.mainApp.unregister() } else { try SMAppService.mainApp.register() }
+            if enabled { try SMAppService.mainApp.register() } else { try SMAppService.mainApp.unregister() }
         } catch {
             alert("没能设置开机自启", "\(error.localizedDescription)\n把 Melon Office 放进「应用程序」文件夹后再试试。")
         }
+        refreshDesktopSettings()
+    }
+
+    private func refreshDesktopSettings() {
+        store.desktop = DesktopPreferences(staff: staff, widgetWidth: widgetWidth,
+            launchAtLogin: SMAppService.mainApp.status == .enabled,
+            claudeState: core.hooksState(port: port), problem: problem, version: updater.currentVersion)
     }
 
     @objc private func quit() {

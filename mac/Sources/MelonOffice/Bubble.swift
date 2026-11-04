@@ -14,6 +14,7 @@ final class Bubble: SKNode {
     private(set) var bw: CGFloat = 0 // box size, used to keep bubbles from covering each other
     private(set) var bh: CGFloat = 0
     private(set) var buttons: [Button] = []
+    private(set) var nameFrame = CGRect.zero
     /// position in page coordinates (top-left origin), set every frame by the scene, then unstacked
     var px: CGFloat = 0
     var py: CGFloat = 0
@@ -93,6 +94,7 @@ final class Bubble: SKNode {
         var x = -w / 2 + pad
         var y = top + 11
         chip.at = CGPoint(x: x, y: y + (row1H - chip.size.height) / 2)
+        nameFrame = CGRect(x: chip.at.x, y: -chip.at.y - chip.size.height, width: chip.size.width, height: chip.size.height)
         msg.at = CGPoint(x: x + chip.size.width + 12, y: y + (row1H - msg.size.height) / 2)
         y += row1H
         var placed: [Piece] = [chip, msg]

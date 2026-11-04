@@ -7,7 +7,7 @@ final class Assets {
     static let shared = Assets()
 
     static let castKeys = ["boss", "gua", "tian", "zi", "agua", "pi", "g1", "g2", "g3", "g4"]
-    static let frameSize = CGSize(width: 180, height: 240)
+    static let frameSize = CGSize(width: 104, height: 156)
 
     let layout: Layout
     let size: CGSize
@@ -15,37 +15,36 @@ final class Assets {
     private var sheets: [String: [SKTexture]] = [:]
     private var avatars: [String: NSImage] = [:]
     /// alpha of the background, to tell the office floor from the empty corners (widget click-through)
-    private let floorMask: [UInt8]
+    private let floorPath: CGPath
 
     private init() {
         let dir = Bundle.main.resourceURL!.appendingPathComponent("assets")
         layout = try! JSONDecoder().decode(Layout.self, from: Data(contentsOf: dir.appendingPathComponent("layout.json")))
         size = CGSize(width: layout.size[0], height: layout.size[1])
-        var images: [String: SKTexture] = [:]
-        for k in ["bg_a", "bg_b", "row1", "row2"] {
-            images[k] = SKTexture(image: NSImage(contentsOf: dir.appendingPathComponent("\(k).png"))!)
-        }
-        self.images = images
-
-        let n = layout.frames.count
+        self.images = ["illustration": SKTexture(image: NSImage(contentsOf: dir.appendingPathComponent("illustration/office.png"))!)]
+        let countColumns = layout.atlas.columns
+        let columns = CGFloat(countColumns), rows = CGFloat(layout.atlas.rows)
         for key in Self.castKeys {
-            guard let img = NSImage(contentsOf: dir.appendingPathComponent("chars/\(key).png")) else { continue }
+            let source = layout.characters[key]!
+            let img = NSImage(contentsOf: dir.appendingPathComponent("illustration/\(source).png"))!
             let sheet = SKTexture(image: img)
-            sheets[key] = (0..<n).map { SKTexture(rect: CGRect(x: Double($0) / Double(n), y: 0, width: 1 / Double(n), height: 1), in: sheet) }
-            // head and shoulders of the first frame, like the web panel's avatar crop
-            if let cg = img.cgImage(forProposedRect: nil, context: nil, hints: nil),
-               let face = cg.cropping(to: CGRect(x: 50, y: 96, width: 80, height: 80)) {
-                avatars[key] = NSImage(cgImage: face, size: NSSize(width: 40, height: 40))
+            sheets[key] = layout.frames.indices.map { i in
+                SKTexture(rect: CGRect(x: CGFloat(i % countColumns) / columns,
+                                      y: 1 - CGFloat(i / countColumns + 1) / rows,
+                                      width: 1 / columns, height: 1 / rows), in: sheet)
             }
+            let cg = img.cgImage(forProposedRect: nil, context: nil, hints: nil)!
+            let cellW = CGFloat(cg.width) / columns, cellH = CGFloat(cg.height) / rows
+            let face = cg.cropping(to: CGRect(x: cellW * 0.18, y: cellH * 0.24, width: cellW * 0.64, height: cellH * 0.48))!
+            avatars[key] = NSImage(cgImage: face, size: NSSize(width: 40, height: 40))
         }
-
-        var mask = [UInt8](repeating: 0, count: Int(size.width) * Int(size.height))
-        if let bg = NSImage(contentsOf: dir.appendingPathComponent("bg_a.png"))?.cgImage(forProposedRect: nil, context: nil, hints: nil),
-           let ctx = CGContext(data: &mask, width: Int(size.width), height: Int(size.height), bitsPerComponent: 8,
-                               bytesPerRow: Int(size.width), space: CGColorSpaceCreateDeviceGray(), bitmapInfo: CGImageAlphaInfo.alphaOnly.rawValue) {
-            ctx.draw(bg, in: CGRect(origin: .zero, size: size))
+        let path = CGMutablePath()
+        for (index, point) in layout.boundary.enumerated() {
+            let p = CGPoint(x: point[0], y: point[1])
+            if index == 0 { path.move(to: p) } else { path.addLine(to: p) }
         }
-        floorMask = mask
+        path.closeSubpath()
+        floorPath = path
     }
 
     func frame(_ cast: String, _ name: String) -> SKTexture {
@@ -58,10 +57,7 @@ final class Assets {
 
     /// is there office (not empty corner) under this point? `p` is in top-left page coordinates
     func onFloor(_ p: CGPoint) -> Bool {
-        let x = Int(p.x), y = Int(p.y)
-        guard x >= 0, y >= 0, x < Int(size.width), y < Int(size.height) else { return false }
-        // bitmap context memory starts with the top row
-        return floorMask[y * Int(size.width) + x] > 0
+        floorPath.contains(p)
     }
 }
 

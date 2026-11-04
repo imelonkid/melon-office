@@ -71,7 +71,7 @@
 |---|---|---|
 | 全新用户 | `melon-office uninstall`，清掉 `hooksChoice` 与 `askedHooks` | 打开 App 弹「接入 Claude Code？」；点「接入」后 `melon-office status` 列出全部事件 |
 | 已接入用户升级 | `melon-office init --port 8123`（模拟旧配置） | 打开 App 不弹窗，收到「已更新 Claude Code 接入」通知；`status` 不再提示过期 |
-| 拒绝过的用户 | 弹窗点「以后再说」，或菜单里移除 | 再次打开不弹窗；菜单显示「接入 Claude Code（未接入）」 |
+| 拒绝过的用户 | 弹窗点「以后再说」，或在设置中关闭接入 | 再次打开不弹窗；「设置 → 接入」的 Claude Code 开关保持关闭 |
 | 命令行版装过 | `melon-office init --no-approvals` | 打开 App 不弹窗、不改配置（已是当前版本），审批仍走终端 |
 
 ## 平台侧（发第一个版本前，由仓库所有者做）
@@ -85,3 +85,11 @@
 ## 图标维护
 
 Dock 图标由 `mac/make_icon.py` 用纯色色块生成（Python 3 + Pillow + macOS `iconutil`），运行 `python3 mac/make_icon.py` 后提交更新的 `mac/AppIcon.icns`。菜单栏由 `StatusIcon.swift` 绘制为模板图像，由系统适配深浅背景。修改后检查 Dock 的 16–1024px 产物及菜单栏三种状态，并编译 Mac 版。
+
+## 场景资源与行为回归
+
+运行时插画原稿和 6×3 角色动画图集位于 `web/public/assets/illustration/`。`npm run assets` 运行 `tools/build_illustrated_layout.mjs`，只重建座位、前景裁切多边形和全连通过道导航，不改原图。网页和 Mac 使用同一份 `layout.json`。`tools/render_assets.py` 保留为早期程序绘图工具，不再用于正式场景。
+
+当前场景采用浅米黄墙面、偏灰地板，工区外保持纯黑。Mac 菜单只保留高频入口；设置中的本机选项通过 `OfficeStore.desktop` 读取实际状态，写操作仍由 `AppDelegate` 调用原有实现。Claude 接入开关以 hooks 检查结果为准，不按勾选的默认值自动写配置；Codex 未实现采集前仅显示不可用说明。验收接入开关使用临时 HOME，不修改日常配置。
+
+换素材须重新量取座位锚点、桌沿遮挡和通道，不能把包含员工的展示图直接作为背景。时钟由运行时覆盖；工位、玻璃办公室、茶水间与行政猫保持在原稿位置。角色帧顺序保留工作、举手、走路、喝咖啡、刷手机、聊天、撸猫及训话动作；访客复用同风格角色图集。检查 `test/office-behavior.test.mjs`，并验收两端的遮挡、寻路、审批及工卡。
