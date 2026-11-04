@@ -11,6 +11,18 @@
     "g3": "agua",
     "g4": "gua"
   },
+  "workAtlas": {
+    "columns": 6,
+    "rows": 2,
+    "characters": [
+      "gua",
+      "tian",
+      "zi",
+      "agua",
+      "pi",
+      "boss"
+    ]
+  },
   "size": [1448, 1086],
   "iso": {
     "ox": 0,

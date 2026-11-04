@@ -24,7 +24,7 @@ const BOSS_LINES = [
   '这个需求，我们拉通对齐一下', '今天的抓手是什么？', 'Q4 要打出组合拳', '大家辛苦了，再冲一下', '把颗粒度再细一点',
 ];
 
-type Variant = 'say' | 'term' | 'ask' | 'angry';
+type Variant = 'say' | 'work' | 'term' | 'ask' | 'angry';
 
 // ---------------------------------------------------------------- speech bubble
 class Bubble extends Phaser.GameObjects.Container {
@@ -42,6 +42,7 @@ class Bubble extends Phaser.GameObjects.Container {
     const sig = JSON.stringify([name, text, variant, pending?.id, pending?.holding, raw]);
     if (sig === this.sig) return;
     this.sig = sig;
+    this.scene.tweens.killTweensOf(this.getAll());
     this.removeAll(true);
     const s = this.scene;
     const pad = 16;
@@ -56,6 +57,7 @@ class Bubble extends Phaser.GameObjects.Container {
     });
     const row1H = Math.max(chip.height, msg.height);
     let w = chip.width + 12 + msg.width;
+    if (variant === 'work') w += 46;
     let h = row1H;
     const extra: Phaser.GameObjects.Text[] = [];
     const buttons: Phaser.GameObjects.Text[] = [];
@@ -109,6 +111,13 @@ class Bubble extends Phaser.GameObjects.Container {
     chip.setPosition(x, y + (row1H - chip.height) / 2);
     msg.setPosition(x + chip.width + 12, y + (row1H - msg.height) / 2);
     this.add([chip, msg]);
+    if (variant === 'work') {
+      for (let i = 0; i < 3; i++) {
+        const dot = s.add.circle(msg.x + msg.width + 10 + i * 12, msg.y + msg.height / 2, 3, 0x4d9873);
+        this.add(dot);
+        s.tweens.add({ targets: dot, y: dot.y - 5, duration: 250, yoyo: true, repeat: -1, repeatDelay: 450, delay: i * 140 });
+      }
+    }
     if (this.select) chip.setInteractive({ useHandCursor: true }).on('pointerdown', this.select);
     y += row1H;
     for (const e of extra) {
@@ -224,6 +233,7 @@ class Worker {
     this.place = 'walk';
     this.glow.setVisible(false);
     this.sprite.play(`${this.agent.cast}-walk`, true);
+    this.sprite.setDisplaySize(104, 156);
     this.path = pts;
     this.lastStep = performance.now();
   }
@@ -275,17 +285,19 @@ class Worker {
     if (this.place === 'seat') {
       const s = this.seat();
       if (!s) return;
+      this.sprite.setFlipX(false);
       this.sprite.setPosition(s.anchor[0], s.anchor[1]).setDepth(s.y * this.scene.layout.iso.s);
       if (a.status === 'slacking' && a.activity !== 'fake') {
         this.glow.setVisible(false);
         this.sprite.play(`${k}-phone`, true);
+        this.sprite.setDisplaySize(104, 156);
         return;
       }
       const color = a.activity === 'fake' ? GLOW.other : GLOW[a.status === 'waiting' ? 'wait' : a.kind] ?? GLOW.other;
       this.glow.setPosition(s.anchor[0], s.anchor[1] - 80).setDepth(this.sprite.depth - 0.5).setFillStyle(color, 0.22).setVisible(true);
       if (a.status === 'waiting') this.sprite.play(`${k}-raise`, true);
       else if ((a.status === 'working' && a.kind !== 'fail') || a.activity === 'fake') this.sprite.play(`${k}-type`, true);
-      else this.sprite.play(`${k}-think`, true);
+      else this.sprite.play(`${k}-${a.status === 'thinking' || a.status === 'working' ? 'workThink' : 'think'}`, true);
     } else {
       this.glow.setVisible(false);
       const [x, y] = this.scene.project(this.pos.x, this.pos.y);
@@ -293,6 +305,8 @@ class Worker {
       const anim = this.place === 'chat' ? 'talk' : this.place === 'cat' ? 'pet' : a.status === 'waiting' || a.activity === 'fake' ? 'stand' : 'mug';
       this.sprite.play(`${k}-${anim}`, true);
     }
+    // The supplementary working atlas has a different pixel density from the original atlas.
+    this.sprite.setDisplaySize(104, 156);
   }
 
   tick(time: number, pending?: Pending) {
@@ -313,9 +327,10 @@ class Worker {
     this.selection.setPosition(selectionX, selectionY).setDepth(this.sprite.depth - 0.1).setVisible(isEmployeeSelected(this.agent.id));
     const a = this.agent;
     const lift = this.place === 'seat' ? 105 : 125;
-    this.bubble.setPosition(this.sprite.x, this.sprite.y - lift - 4 * Math.sin(time / 450 + this.phase));
-    const variant: Variant = a.status === 'waiting' ? 'ask' : a.status === 'working' && a.kind === 'bash' ? 'term' : 'say';
-    this.bubble.show(a.name, a.cast, lineOf(a), variant, pending, rawOf(a.raw));
+    const working = a.status === 'working' || a.status === 'thinking';
+    this.bubble.setPosition(this.sprite.x, this.sprite.y - lift - (working ? 0 : 4 * Math.sin(time / 450 + this.phase)));
+    const variant: Variant = a.status === 'waiting' ? 'ask' : working ? 'work' : 'say';
+    this.bubble.show(a.name, a.cast, working ? '工作中' : lineOf(a), variant, pending, working ? '' : rawOf(a.raw));
   }
 }
 
@@ -347,6 +362,7 @@ export class OfficeScene extends Phaser.Scene {
   preload() {
     this.load.json('layout', 'assets/layout.json');
     this.load.image('illustration', 'assets/illustration/office.png');
+    this.load.image('working', 'assets/illustration/working.png');
     const characters: Record<string, string> = layoutData.characters;
     for (const k of CAST_KEYS) this.load.image(k, `assets/illustration/${characters[k]}.png`);
   }
@@ -435,10 +451,21 @@ export class OfficeScene extends Phaser.Scene {
       }
     }
 
+    const work = this.textures.get('working');
+    const workImage = work.getSourceImage() as HTMLImageElement;
+    const workAtlas = this.layout.workAtlas;
+    for (let col = 0; col < workAtlas.columns; col++) {
+      for (let row = 0; row < workAtlas.rows; row++) {
+        work.add(`${workAtlas.characters[col]}-${row}`, 0, col * workImage.width / workAtlas.columns, row * workImage.height / workAtlas.rows,
+          workImage.width / workAtlas.columns, workImage.height / workAtlas.rows);
+      }
+    }
     const f = (n: string) => ({ key: '', frame: this.frame(n) });
     for (const k of CAST_KEYS) {
       const fr = (names: string[]) => names.map((n) => ({ ...f(n), key: k }));
-      this.anims.create({ key: `${k}-type`, frames: fr(['sit', 'sit_type']), frameRate: 5, repeat: -1 });
+      const workFrames = [0, 1].map((row) => ({ key: 'working', frame: `${this.layout.characters[k]}-${row}` }));
+      this.anims.create({ key: `${k}-type`, frames: workFrames, frameRate: 5, repeat: -1 });
+      this.anims.create({ key: `${k}-workThink`, frames: [workFrames[0], workFrames[0], workFrames[0], workFrames[1]], frameRate: 2, repeat: -1 });
       this.anims.create({ key: `${k}-raise`, frames: fr(['sit_raise', 'sit_raise2']), frameRate: 3, repeat: -1 });
       this.anims.create({ key: `${k}-think`, frames: fr(['sit', 'sit', 'sit', 'sit', 'sit', 'sit_blink']), frameRate: 4, repeat: -1 });
       this.anims.create({ key: `${k}-walk`, frames: fr(['walk1', 'walk2']), frameRate: 7, repeat: -1 });

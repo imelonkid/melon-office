@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { employeeProfile } from '../server/employee-profile.mjs';
+import { Office } from '../server/office.mjs';
 
 const now = 1200000;
 const agent = { id: 'staff:tian', name: '小甜', sessionId: 'session-a', startedAt: now - 180000, status: 'working', resident: true };
@@ -31,4 +32,20 @@ test('waiting, departing and intern states remain distinct', () => {
   assert.equal(employeeProfile({ ...agent, status: 'leaving' }, [], now).status, '正在下班');
   assert.equal(employeeProfile({ ...agent, isSub: true }, [], now).employment, '实习生');
   assert.equal(employeeProfile({ ...agent, startedAt: now + 1 }, [], now).tenure, '不足 1 分钟');
+});
+
+test('employee recent activity retains the command summary when the next operation starts', () => {
+  const office = new Office({ staff: 0, remember: false });
+  try {
+    const send = (tool_name, tool_input) => office.handle({ session_id: 'history-fixture', hook_event_name: 'PreToolUse', tool_name, tool_input });
+    send('Bash', { command: 'npm run test', description: '运行测试' });
+    send('Read', { file_path: '/fixture/README.md' });
+    const agent = office.snapshot().agents[0];
+    assert.equal(agent.status, 'working');
+    assert.notEqual(agent.raw, '$ npm run test');
+    const previous = agent.profile.recent.find((item) => item.raw === '$ npm run test');
+    assert.ok(previous, 'opening employee details must retain earlier command summaries');
+    assert.equal(previous.text, '跑测试');
+    assert.ok(agent.profile.recent.some((item) => item.text.includes('README.md')));
+  } finally { office.dispose(); }
 });

@@ -5,7 +5,7 @@ import SpriteKit
 /// Drawn into one texture with AppKit text (crisp, wraps like the web version) and only redrawn when its
 /// content changes. The tail tip sits at the node's origin.
 final class Bubble: SKNode {
-    enum Variant { case say, term, ask, angry }
+    enum Variant { case say, work, term, ask, angry }
 
     struct Button { let rect: CGRect; let id: String; let behavior: String }
 
@@ -61,6 +61,7 @@ final class Bubble: SKNode {
         var msg = piece(text, Fonts.ui(25, bold: variant == .ask || variant == .angry), term ? NSColor(hex: 0xF5F2FF) : NSColor(hex: 0x2A2440), wrap: 520)
         let row1H = max(chip.size.height, msg.size.height)
         var w = chip.size.width + 12 + msg.size.width
+        if variant == .work { w += 46 }
         var h = row1H
         var extra: [(Piece, CGFloat)] = [] // piece, gap above
         var btns: [(Piece, String)] = []
@@ -158,6 +159,21 @@ final class Bubble: SKNode {
         // buttons in node coordinates (y up)
         buttons = hits.map { rect, behavior in
             Button(rect: CGRect(x: rect.minX, y: -rect.maxY, width: rect.width, height: rect.height), id: pending?.id ?? "", behavior: behavior)
+        }
+
+        children.filter { $0.name?.hasPrefix("work-dot-") == true }.forEach { $0.removeFromParent() }
+        if variant == .work {
+            for i in 0..<3 {
+                let dot = SKShapeNode(circleOfRadius: 3)
+                dot.name = "work-dot-\(i)"
+                dot.zPosition = 1
+                dot.fillColor = NSColor(hex: 0x4D9873); dot.strokeColor = .clear
+                dot.position = CGPoint(x: msg.at.x + msg.size.width + 10 + CGFloat(i) * 12, y: -msg.at.y - msg.size.height / 2)
+                dot.run(.sequence([.wait(forDuration: Double(i) * 0.14), .repeatForever(.sequence([
+                    .moveBy(x: 0, y: 5, duration: 0.25), .moveBy(x: 0, y: -5, duration: 0.25), .wait(forDuration: 0.45),
+                ]))]))
+                addChild(dot)
+            }
         }
 
         // the blinking "!" on approval bubbles

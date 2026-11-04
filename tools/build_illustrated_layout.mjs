@@ -50,6 +50,7 @@ const foregrounds = [
 
 const layout={
  characters:{boss:'boss',gua:'gua',tian:'tian',zi:'zi',agua:'agua',pi:'pi',g1:'pi',g2:'zi',g3:'agua',g4:'gua'},
+ workAtlas:{columns:6,rows:2,characters:['gua','tian','zi','agua','pi','boss']},
  size:[1448,1086],iso:{ox:0,oy:0,s:50},cell:{w:104,h:156,ax:52,ay:146.64},atlas:{columns:6,rows:3},frames,
  seats:seatPoints.map(([x,y],i)=>({id:`seat-${i}`,row:i<3?'row1':'row2',x:x/50,y:y/50,anchor:[x,y-12]})),
  spots:{entrance:nodes[entrance],aisleEast:nodes[right],pantryDoor:nodes[r1],pantry:[p1,p2,p3,p4].map(i=>nodes[i]),rack:nodes[fl],cat:nodes[cat],chat:[[nodes[c1],nodes[c2]],[nodes[p2],nodes[p3]]],boss:nodes[boss],bossRoute:paths[boss][m2].map(i=>nodes[i])},

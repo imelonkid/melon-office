@@ -33,6 +33,7 @@ struct Agent: Equatable {
     }
 
     var isBusy: Bool { ["working", "thinking", "waiting"].contains(status) }
+    var isWorking: Bool { status == "working" || status == "thinking" }
 }
 
 struct EmployeeProfile: Equatable {
@@ -40,6 +41,7 @@ struct EmployeeProfile: Equatable {
         let id: Int
         let time: Double
         let text: String
+        let raw: String
     }
     var source, status, tenure, employment: String
     var recent: [Event]
@@ -48,7 +50,7 @@ struct EmployeeProfile: Equatable {
         source = d.str("source"); status = d.str("status")
         tenure = d.str("tenure"); employment = d.str("employment")
         recent = d.list("recent").enumerated().map { index, item in
-            Event(id: index, time: item.num("t"), text: item.str("text"))
+            Event(id: index, time: item.num("t"), text: item.str("text"), raw: item.str("raw"))
         }
     }
 }
@@ -124,9 +126,11 @@ struct OfficeState: Equatable {
 // web/public/assets/layout.json, written by tools/render_assets.py
 struct Layout: Decodable {
     struct Atlas: Decodable { let columns, rows: Int }
+    struct WorkAtlas: Decodable { let columns, rows: Int; let characters: [String] }
     struct Foreground: Decodable { let depth: Double; let points: [[Double]] }
     struct Navigation: Decodable { let nodes: [[Double]]; let next: [[Int]] }
     let atlas: Atlas
+    let workAtlas: WorkAtlas
     let characters: [String: String]
     let boundary: [[Double]]
     let foregrounds: [Foreground]
