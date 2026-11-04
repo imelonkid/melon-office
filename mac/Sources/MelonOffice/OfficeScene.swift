@@ -273,6 +273,7 @@ private final class Worker {
 
 // ---------------------------------------------------------------- the office
 final class OfficeScene: SKScene {
+    private(set) var lastFrameTime = CACurrentMediaTime()
     let store: OfficeStore
     let layout = Assets.shared.layout
     private let widget: Bool
@@ -492,6 +493,7 @@ final class OfficeScene: SKScene {
     }
 
     override func update(_ currentTime: TimeInterval) {
+        lastFrameTime = CACurrentMediaTime()
         guard built else { return }
         let time = now()
         for w in Array(workers.values) { w.tick(time, pending: pendingByAgent[w.agent.id]) }
