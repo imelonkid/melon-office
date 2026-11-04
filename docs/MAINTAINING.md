@@ -81,3 +81,7 @@
 3. production 环境：上表的变量与 Secret（签名证书与公证密钥可与其他 App 共用同一份，Secret 按仓库各设一份）；`OSS_BUCKET=melon-download OSS_ENDPOINT=oss-cn-beijing.aliyuncs.com OSS_ACCESS_KEY_ID=… OSS_ACCESS_KEY_SECRET=… scripts/release-desktop.sh oss-test` 先验证能写、公网能读
 4. 门户：运维仓库 `portal/config.json` 加一条（基线模板 `portal-service.json`，`pipelines.release.use: desktop-release`，`online` 读上面的 `latest.json`，`paths` 写 `mac/`、`server/`、`web/`、`scripts/`，`"auto_release": false`），`portal/push.sh`；门户令牌的仓库范围加上本仓库
 5. melon-ci：`v2` tag 目前还没包含「钉公证票据失败时重试」（main 上已合并），签名发布偶尔会因苹果 CloudKit 断连失败；挪 `v2` 之前遇到了就重跑
+
+## 图标维护
+
+Dock 图标由 `mac/make_icon.py` 用纯色色块生成（Python 3 + Pillow + macOS `iconutil`），运行 `python3 mac/make_icon.py` 后提交更新的 `mac/AppIcon.icns`。菜单栏由 `StatusIcon.swift` 绘制为模板图像，由系统适配深浅背景。修改后检查 Dock 的 16–1024px 产物及菜单栏三种状态，并编译 Mac 版。

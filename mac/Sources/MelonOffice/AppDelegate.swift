@@ -40,7 +40,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         server.onSocketsChanged = { [weak self] in self?.updateClients() }
 
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        statusItem.button?.title = "🍈"
+        statusItem.button?.imagePosition = .imageLeading
+        refreshTitle()
         let menu = NSMenu()
         menu.delegate = self
         statusItem.menu = menu
@@ -91,9 +92,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var approvalsOn: Bool { state.approvalsEnabled }
 
     private func refreshTitle() {
-        var title = problem != nil ? "🍈 ⚠︎" : busy > 0 ? "🍈 \(busy)" : "🍈"
+        let icon: StatusIcon = problem != nil || !asks.isEmpty ? .attention : busy > 0 ? .working : .idle
+        var title = busy > 0 ? " \(busy)" : ""
         if !asks.isEmpty { title += " · 审批 \(asks.count)" }
+        statusItem.button?.image = icon.image
         statusItem.button?.title = title
+        let summary = "加班 \(busy) · 摸鱼 \(slacking) · 待审批 \(asks.count)"
+        statusItem.button?.toolTip = problem ?? summary
+        statusItem.button?.setAccessibilityLabel("Melon Office：\(problem ?? summary)")
     }
 
     // MARK: - menu
