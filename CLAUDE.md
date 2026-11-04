@@ -43,5 +43,6 @@ npm run mac            # → mac/build/Melon Office.app
 - 改代码同步改 `README.md` 与 `README.zh-CN.md`（面向用户）；运维内容写 `docs/MAINTAINING.md`，README 不引用它
 - 发布与回滚一律走 tag，**只在内网门户上点**（GitHub「发布」表单兜底）；版本号：修 bug → patch，新功能 → minor，不兼容 → major。发布方式见 `docs/MAINTAINING.md`
 - PR 一律以 `main` 为目标，不开叠加 PR
+- 代码修改并通过验收后，主动提交并 Push，不等用户追问；若需要审批，主动发起审批。Push 后跟进该提交的 CI，失败则修复后再次 Push，直到通过或遇到需要用户决策的问题。不自动合并，不自动发布
 - **PR 合并（或关闭）后这个分支就作废**：后续改动先 `git switch main && git pull`，再开新分支。已经在旧分支上提交了的，把新提交 `git cherry-pick` 到新分支再开 PR
 - 公开仓库：不写主机地址、内网坐标与任何密钥；提交信息 `<类型>(<范围>): <中文描述>`

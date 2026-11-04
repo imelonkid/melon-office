@@ -5,9 +5,9 @@ import SwiftUI
 // The main window: header chips, the office scene with its caption, and the OA 工作台 on the right.
 // Same content as web/index.html + web/src/panel.ts, in SwiftUI.
 
-private extension Color {
+extension Color {
     init(_ hex: UInt32) { self.init(nsColor: NSColor(hex: hex)) }
-    static let bg = Color(0x0C0C0F), panel = Color(0x1C1C21), card = Color(0x28282E), cardDim = Color(0x222227)
+    static let bg = Color(0x000000), panel = Color(0x1C1C21), card = Color(0x28282E), cardDim = Color(0x222227)
     static let text = Color(0xF5F2FF), muted = Color(0x9A93C2), accent = Color(0x9BE29F), warn = Color(0xFF8A5E)
 }
 
@@ -61,9 +61,8 @@ struct OfficeView: View {
     private func header(_ s: OfficeState) -> some View {
         HStack {
             HStack(spacing: 12) {
-                Circle().fill(Color(0x7CC46F)).frame(width: 28, height: 28)
-                    .overlay(Rectangle().fill(Color(0x3F7F3A)).frame(width: 2))
-                    .clipShape(Circle())
+                Image(nsImage: StatusIcon.working.image).resizable().scaledToFit()
+                    .frame(width: 28, height: 28).foregroundColor(.accent)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(s.settings.officeName).font(.system(size: 18, weight: .black)).foregroundColor(.text).lineLimit(1)
                     Text("B3 工区 · Claude Code 实时").font(.system(size: 12)).foregroundColor(.muted)
@@ -100,14 +99,25 @@ private struct PanelView: View {
     @State private var copied = false
 
     var body: some View {
+        Group {
+            if store.selectedEmployeeId != nil {
+                EmployeeProfileView(store: store)
+            } else {
+                overview
+            }
+        }
+        .padding(18)
+        .background(RoundedRectangle(cornerRadius: 22).fill(Color.panel))
+    }
+
+    private var overview: some View {
         let s = store.state
-        let waitingIds = Set(s.holding.map(\.agentId) + s.pending.map(\.agentId))
+        let waitingIds = Set(s.pending.map(\.agentId))
         let asks = s.pending.compactMap { p in s.agent(p.agentId).map { (p, $0) } }
         let busy = s.agents.filter { !waitingIds.contains($0.id) && $0.isBusy }
         let chill = s.agents.filter { $0.status == "idle" || $0.status == "leaving" }
         let slacking = s.slacking
-
-        VStack(alignment: .leading, spacing: 8) {
+        return VStack(alignment: .leading, spacing: 8) {
             HStack {
                 Text("OA 工作台").font(.system(size: 17, weight: .black)).foregroundColor(.text)
                 Spacer()
@@ -140,8 +150,6 @@ private struct PanelView: View {
                 Text("录屏模式：已隐藏文件名和命令").font(.system(size: 11)).foregroundColor(.muted).frame(maxWidth: .infinity)
             }
         }
-        .padding(18)
-        .background(RoundedRectangle(cornerRadius: 22).fill(Color.panel))
     }
 
     private func section(_ title: String, color: Color) -> some View {
@@ -165,31 +173,38 @@ private struct PanelView: View {
         let raw = store.raw(a.raw)
         let proj = store.project(a)
         let kindColor: [String: Color] = ["edit": .accent, "read": Color(0x7EC8F2), "search": Color(0x7EC8F2), "bash": Color(0xF2A65A), "web": Color(0xC78BE8), "fail": Color(0xFF8A80)]
-        return HStack(spacing: 10) {
-            avatar(a)
-            VStack(alignment: .leading, spacing: 3) {
-                HStack {
-                    Text(a.name).font(.system(size: 13, weight: .bold)).foregroundColor(.text).lineLimit(1)
-                    Spacer()
-                    Text(right).font(.system(size: 11)).foregroundColor(.muted).lineLimit(1)
+        return Button { store.selectEmployee(a.id) } label: {
+            HStack(spacing: 10) {
+                avatar(a)
+                VStack(alignment: .leading, spacing: 3) {
+                    HStack {
+                        Text(a.name).font(.system(size: 13, weight: .bold)).foregroundColor(.text).lineLimit(1)
+                        Spacer()
+                        Text(right).font(.system(size: 11)).foregroundColor(.muted).lineLimit(1)
+                    }
+                    Text(store.line(a)).font(.system(size: 12)).foregroundColor(.text).lineLimit(1)
+                    if !raw.isEmpty {
+                        Text(raw).font(.system(size: 11, design: .monospaced)).foregroundColor(kindColor[a.kind] ?? Color(0xC9BFE0)).lineLimit(1)
+                    }
+                    if !proj.isEmpty { Text("\(a.role) · \(proj)").font(.system(size: 11)).foregroundColor(.muted) }
                 }
-                Text(store.line(a)).font(.system(size: 12)).foregroundColor(.text).lineLimit(1)
-                if !raw.isEmpty {
-                    Text(raw).font(.system(size: 11, design: .monospaced)).foregroundColor(kindColor[a.kind] ?? Color(0xC9BFE0)).lineLimit(1)
-                }
-                if !proj.isEmpty { Text("\(a.role) · \(proj)").font(.system(size: 11)).foregroundColor(.muted) }
             }
+            .padding(.vertical, 8).padding(.horizontal, 10)
+            .background(RoundedRectangle(cornerRadius: 14).fill(dim ? Color.cardDim : Color.card))
+            .contentShape(RoundedRectangle(cornerRadius: 14))
         }
-        .padding(.vertical, 8).padding(.horizontal, 10)
-        .background(RoundedRectangle(cornerRadius: 14).fill(dim ? Color.cardDim : Color.card))
+        .buttonStyle(.plain)
+        .accessibilityLabel("查看\(a.name)的员工档案")
     }
 
     private func askCard(_ p: Pending, _ a: Agent) -> some View {
         HStack(spacing: 10) {
-            avatar(a)
+            Button { store.selectEmployee(a.id) } label: { avatar(a) }.buttonStyle(.plain)
             VStack(alignment: .leading, spacing: 4) {
-                Text(a.name).font(.system(size: 13, weight: .bold)).foregroundColor(.text)
+                Button(a.name) { store.selectEmployee(a.id) }
+                    .buttonStyle(.plain).font(.system(size: 13, weight: .bold)).foregroundColor(.text)
                 Text("想要：\(store.ask(p))").font(.system(size: 12)).foregroundColor(.text).lineLimit(2)
+                    .onTapGesture { store.selectEmployee(a.id) }
                 if p.holding {
                     HStack(spacing: 6) {
                         Button("同意") { store.decide(p.id, "allow") }.buttonStyle(Pill(bg: .accent, fg: Color(0x1F3A1B)))
@@ -202,7 +217,8 @@ private struct PanelView: View {
             Spacer(minLength: 0)
         }
         .padding(.vertical, 8).padding(.horizontal, 10)
-        .background(RoundedRectangle(cornerRadius: 14).fill(Color(0x2C2421)))
+        .background(RoundedRectangle(cornerRadius: 14).fill(Color(0x2C2421))
+            .onTapGesture { store.selectEmployee(a.id) })
         .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.warn, lineWidth: 1.5))
     }
 

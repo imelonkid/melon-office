@@ -1,13 +1,14 @@
 import Phaser from 'phaser';
+import layoutData from '../public/assets/layout.json';
 import type { Agent, Layout, Pending, Scold, State, XY } from './types';
 import { net } from './net';
+import { selectEmployee, isEmployeeSelected } from './selection';
 import { askOf, lineOf, rawOf } from './copy';
 
 const CAST_KEYS = ['boss', 'gua', 'tian', 'zi', 'agua', 'pi', 'g1', 'g2', 'g3', 'g4'];
 const FONT = '"PingFang SC","Hiragino Sans GB","Noto Sans SC","Microsoft YaHei",sans-serif';
 const MONO = 'Menlo,"SF Mono",Consolas,monospace';
 const SPEED = 2.4; // floor units per second
-const CAT_LANE = 7.9; // open floor between the row-2 desks and the cot, the way to the cat
 
 // monitor-glow color per kind of work (pixtuoid-style), drawn as a halo around the seated employee
 const GLOW: Record<string, number> = {
@@ -31,7 +32,7 @@ class Bubble extends Phaser.GameObjects.Container {
   bw = 0; // box size, used to keep bubbles from covering each other
   bh = 0;
 
-  constructor(scene: Phaser.Scene) {
+  constructor(scene: Phaser.Scene, private select?: () => void) {
     super(scene, 0, 0);
     scene.add.existing(this);
     this.setDepth(1000);
@@ -108,6 +109,7 @@ class Bubble extends Phaser.GameObjects.Container {
     chip.setPosition(x, y + (row1H - chip.height) / 2);
     msg.setPosition(x + chip.width + 12, y + (row1H - msg.height) / 2);
     this.add([chip, msg]);
+    if (this.select) chip.setInteractive({ useHandCursor: true }).on('pointerdown', this.select);
     y += row1H;
     for (const e of extra) {
       y += 7;
@@ -138,6 +140,7 @@ type Target = Spot | 'exit';
 class Worker {
   sprite: Phaser.GameObjects.Sprite;
   glow: Phaser.GameObjects.Ellipse;
+  selection: Phaser.GameObjects.Ellipse;
   bubble: Bubble;
   pos = { x: 0, y: 0 };
   place: Place = 'walk';
@@ -156,10 +159,12 @@ class Worker {
     this.pos = { x: ex, y: ey };
     const [sx, sy] = scene.project(ex, ey);
     this.lastSx = sx;
-    this.sprite = scene.add.sprite(sx, sy, agent.cast, scene.frame('stand')).setOrigin(0.5, 0.9).setAlpha(0).setDepth(60);
+    this.sprite = scene.add.sprite(sx, sy, agent.cast, scene.frame('stand')).setOrigin(0.5, 0.94).setDisplaySize(104, 156).setAlpha(0).setDepth(60);
     scene.tweens.add({ targets: this.sprite, alpha: 1, duration: 400 });
     this.glow = scene.add.ellipse(0, 0, 150, 110, 0xffffff, 0.22).setVisible(false);
-    this.bubble = new Bubble(scene);
+    this.sprite.setInteractive({ pixelPerfect: true, useHandCursor: true }).on('pointerdown', () => selectEmployee(this.agent.id));
+    this.selection = scene.add.ellipse(0, 0, 100, 30).setStrokeStyle(3, 0xb0e0c7).setVisible(false);
+    this.bubble = new Bubble(scene, () => selectEmployee(this.agent.id));
     if (agent.status === 'idle') this.idleSince = performance.now() - (instant ? 10000 : 0);
     this.decide();
     if (instant && this.path.length) {
@@ -203,7 +208,6 @@ class Worker {
   private go() {
     this.scene.releaseSpots(this, this.target);
     const L = this.scene.layout;
-    const lane = L.spots.aisleEast[0];
     let dest: XY;
     if (this.target === 'chat') {
       const spot = this.scene.claimChat(this);
@@ -215,19 +219,7 @@ class Worker {
     else if (this.target === 'cat') dest = L.spots.cat;
     else if (this.target === 'exit') dest = L.spots.entrance;
 
-    let here: XY = [this.pos.x, this.pos.y];
-    const pts: XY[] = [];
-    // the cot is in the way: step back out to the open floor before heading anywhere
-    if (here[0] < lane - 0.5 && here[1] > CAT_LANE + 0.05) {
-      here = [here[0], CAT_LANE];
-      pts.push(here);
-    }
-    // ...and come in to the cat the same way
-    const via: XY[] = this.target === 'cat' ? [[dest![0], CAT_LANE]] : [];
-    const aim = via[0] || dest!;
-    if (Math.abs(here[0] - lane) > 0.05 && Math.abs(here[1] - aim[1]) > 0.05) pts.push([lane, here[1]]);
-    if (Math.abs(here[1] - aim[1]) > 0.05) pts.push([lane, aim[1]]);
-    pts.push(...via, dest!);
+    const pts = this.scene.routeTo([this.pos.x, this.pos.y], dest!);
 
     this.place = 'walk';
     this.glow.setVisible(false);
@@ -266,7 +258,7 @@ class Worker {
       this.removed = true;
       this.scene.tweens.add({
         targets: [this.sprite, this.bubble], alpha: 0, duration: 500,
-        onComplete: () => { this.sprite.destroy(); this.glow.destroy(); this.bubble.destroy(); },
+        onComplete: () => { this.sprite.destroy(); this.glow.destroy(); this.selection.destroy(); this.bubble.destroy(); },
       });
       this.scene.forget(this);
       return;
@@ -283,7 +275,7 @@ class Worker {
     if (this.place === 'seat') {
       const s = this.seat();
       if (!s) return;
-      this.sprite.setPosition(s.anchor[0], s.anchor[1]).setDepth(s.row === 'row1' ? 10 : 30);
+      this.sprite.setPosition(s.anchor[0], s.anchor[1]).setDepth(s.y * this.scene.layout.iso.s);
       if (a.status === 'slacking' && a.activity !== 'fake') {
         this.glow.setVisible(false);
         this.sprite.play(`${k}-phone`, true);
@@ -317,8 +309,10 @@ class Worker {
     } else if (this.agent.status === 'idle' && this.place === 'seat' && performance.now() - this.idleSince > 5000) {
       this.decide();
     }
+    const [selectionX, selectionY] = this.scene.project(this.pos.x, this.pos.y);
+    this.selection.setPosition(selectionX, selectionY).setDepth(this.sprite.depth - 0.1).setVisible(isEmployeeSelected(this.agent.id));
     const a = this.agent;
-    const lift = this.place === 'seat' ? 122 : 150;
+    const lift = this.place === 'seat' ? 105 : 125;
     this.bubble.setPosition(this.sprite.x, this.sprite.y - lift - 4 * Math.sin(time / 450 + this.phase));
     const variant: Variant = a.status === 'waiting' ? 'ask' : a.status === 'working' && a.kind === 'bash' ? 'term' : 'say';
     this.bubble.show(a.name, a.cast, lineOf(a), variant, pending, rawOf(a.raw));
@@ -352,8 +346,9 @@ export class OfficeScene extends Phaser.Scene {
 
   preload() {
     this.load.json('layout', 'assets/layout.json');
-    for (const k of ['bg_a', 'bg_b', 'row1', 'row2']) this.load.image(k, `assets/${k}.png`);
-    for (const k of CAST_KEYS) this.load.spritesheet(k, `assets/chars/${k}.png`, { frameWidth: 180, frameHeight: 240 });
+    this.load.image('illustration', 'assets/illustration/office.png');
+    const characters: Record<string, string> = layoutData.characters;
+    for (const k of CAST_KEYS) this.load.image(k, `assets/illustration/${characters[k]}.png`);
   }
 
   frame(name: string) {
@@ -362,16 +357,20 @@ export class OfficeScene extends Phaser.Scene {
 
   project(x: number, y: number, z = 0): XY {
     const { ox, oy, s } = this.layout.iso;
-    return [ox + (x - y) * s, oy + ((x + y) * s) / 2 - z * s];
+    return [ox + x * s, oy + y * s - z * s];
   }
 
   // painter's order for anyone standing / walking on the floor
-  depthFor(x: number, y: number) {
-    if (x > 9) return 50 + y;
-    if (y < 2.2) return 15;   // behind row-1 desks
-    if (y < 4.3) return 25;   // between the rows
-    if (y < 5.4) return 35;   // behind row-2 desks
-    return 50 + y;
+  depthFor(_x: number, y: number) { return y * this.layout.iso.s; }
+
+  routeTo(from: XY, to: XY): XY[] {
+    const { nodes, next } = this.layout.navigation;
+    const nearest = (p: XY) => nodes.reduce((best, point, i) =>
+      Math.hypot(point[0]-p[0], point[1]-p[1]) < Math.hypot(nodes[best][0]-p[0], nodes[best][1]-p[1]) ? i : best, 0);
+    const start = nearest(from), end = nearest(to);
+    const route: XY[] = [nodes[start]];
+    for (let current=start; current!==end;) { current=next[current][end]; route.push(nodes[current]); }
+    return [...route, to];
   }
 
   claimPantry(w: Worker): XY {
@@ -419,11 +418,22 @@ export class OfficeScene extends Phaser.Scene {
 
   create() {
     this.layout = this.cache.json.get('layout');
-    this.add.image(0, 0, 'bg_a').setOrigin(0).setDepth(0);
-    const bgB = this.add.image(0, 0, 'bg_b').setOrigin(0).setDepth(0.1).setAlpha(0);
-    this.time.addEvent({ delay: 700, loop: true, callback: () => bgB.setAlpha(bgB.alpha ? 0 : 1) });
-    this.add.image(0, 0, 'row1').setOrigin(0).setDepth(20);
-    this.add.image(0, 0, 'row2').setOrigin(0).setDepth(40);
+    this.scale.setGameSize(...this.layout.size);
+    const layer = (points: XY[], depth: number) => {
+      const mask = this.make.graphics({}, false).fillStyle(0xffffff).fillPoints(points.map(([x,y]) => new Phaser.Geom.Point(x,y)), true);
+      this.add.image(0,0,'illustration').setOrigin(0).setDepth(depth).setMask(mask.createGeometryMask());
+    };
+    layer(this.layout.boundary, 0);
+    for (const front of this.layout.foregrounds) layer(front.points, front.depth);
+    for (const k of CAST_KEYS) {
+      const texture = this.textures.get(k);
+      const image = texture.getSourceImage() as HTMLImageElement;
+      for (let i=0; i<this.layout.frames.length; i++) {
+        const col=i%6, row=Math.floor(i/6);
+        const x=Math.round(col*image.width/6), y=Math.round(row*image.height/3);
+        texture.add(i,0,x,y,Math.round((col+1)*image.width/6)-x,Math.round((row+1)*image.height/3)-y);
+      }
+    }
 
     const f = (n: string) => ({ key: '', frame: this.frame(n) });
     for (const k of CAST_KEYS) {
@@ -441,15 +451,15 @@ export class OfficeScene extends Phaser.Scene {
     }
 
     this.wallTex = this.textures.createCanvas('walltext', this.layout.size[0], this.layout.size[1])!;
-    this.add.image(0, 0, 'walltext').setOrigin(0).setDepth(0.2);
+    this.add.image(0, 0, 'walltext').setOrigin(0).setDepth(1);
     this.drawWall();
-    this.time.addEvent({ delay: 20000, loop: true, callback: () => this.drawWall() });
+    this.time.addEvent({ delay: 1000, loop: true, callback: () => this.drawWall() });
 
     // 瓜老板 = you. He lives in the meeting room and nags when something needs your approval.
     this.bossPos = [...this.layout.spots.boss];
     const [bx, by] = this.project(...this.bossPos);
-    this.boss = this.add.sprite(bx, by, 'boss', this.frame('stand')).setOrigin(0.5, 0.9).setDepth(60);
-    this.boss.play('boss-stand');
+    this.boss = this.add.sprite(bx, by, 'boss', this.frame('stand')).setOrigin(0.5, 0.94).setDisplaySize(104,156).setDepth(this.depthFor(...this.bossPos));
+    this.boss.play('boss-think');
     this.bossBubble = new Bubble(this);
     let i = 0;
     this.time.addEvent({ delay: 9000, loop: true, callback: () => { this.bossLine = BOSS_LINES[++i % BOSS_LINES.length]; } });
@@ -459,35 +469,16 @@ export class OfficeScene extends Phaser.Scene {
 
   private drawWall() {
     const ctx = this.wallTex.getContext();
-    const { s } = this.layout.iso;
-    ctx.clearRect(0, 0, this.layout.size[0], this.layout.size[1]);
-    const skewed = (at: XY, draw: () => void) => {
-      ctx.save();
-      ctx.setTransform(1, 0.5, 0, 1, at[0], at[1]); // wall A runs along the floor x axis: skewY(atan .5)
-      draw();
-      ctx.restore();
-    };
-    skewed(this.layout.wall.banner, () => {
-      ctx.font = `900 25px ${FONT}`;
-      ctx.fillStyle = '#FFE9A8';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText('拥 抱 变 化  ·  使 命 必 达', (6.9 * s) / 2, (0.57 * s) / 2);
-    });
-    skewed(this.layout.wall.clock, () => {
-      const d = new Date();
-      ctx.font = `bold 24px ${MONO}`;
-      ctx.fillStyle = '#FF8A5E';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(`${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`, (1.2 * s) / 2, (0.6 * s) / 2);
-    });
-    skewed(this.layout.wall.projector, () => {
-      ctx.font = `bold 18px ${FONT}`;
-      ctx.fillStyle = '#2A2440';
-      ctx.textBaseline = 'top';
-      ctx.fillText('Q4 增长复盘', 0, 6);
-    });
+    ctx.clearRect(0, 0, ...this.layout.size);
+    const at = this.layout.wall.clock;
+    ctx.save();
+    ctx.setTransform(1,-0.55,0,1,at[0],at[1]);
+    const d = new Date();
+    ctx.font = `bold 24px ${MONO}`;
+    ctx.fillStyle = '#BCE6D2';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(`${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`, 40, 18);
+    ctx.restore();
     this.wallTex.refresh();
   }
 
@@ -518,9 +509,9 @@ export class OfficeScene extends Phaser.Scene {
   private walkBoss(goal: 'room' | 'floor') {
     if (goal === this.bossGoal) return;
     this.bossGoal = goal;
-    const route: XY[] = [[9.3, 3.5], [9.3, 3.0], [8.6, 3.0], [8.6, 3.75], [5.2, 3.75]];
+    const route = this.layout.spots.bossRoute;
     const [rx, ry] = this.layout.spots.boss;
-    this.bossPath = goal === 'floor' ? route : [...route.slice(0, -1).reverse(), [rx, 3.5], [rx, ry]];
+    this.bossPath = goal === 'floor' ? route : [...route.slice(0, -1).reverse(), [rx, ry]];
     this.bossLastStep = performance.now();
     this.boss.play('boss-walk', true);
   }
@@ -547,7 +538,7 @@ export class OfficeScene extends Phaser.Scene {
     this.boss.setPosition(x, y).setDepth(this.depthFor(...this.bossPos));
     if (!this.bossPath.length) {
       this.boss.setFlipX(false);
-      this.boss.play(this.bossGoal === 'floor' ? 'boss-scold' : 'boss-stand', true);
+      this.boss.play(this.bossGoal === 'floor' ? 'boss-scold' : 'boss-think', true);
     }
   }
 
@@ -564,7 +555,7 @@ export class OfficeScene extends Phaser.Scene {
       variant = 'angry';
       shake = this.bossPath.length ? 0 : 3 * Math.sin(time / 25);
     }
-    this.bossBubble.setPosition(this.boss.x + shake, this.boss.y - 150 - 4 * Math.sin(time / 500));
+    this.bossBubble.setPosition(this.boss.x + shake, this.boss.y - 125 - 4 * Math.sin(time / 500));
     this.bossBubble.show('瓜老板（你）', 'boss', line, variant);
     this.unstack();
   }

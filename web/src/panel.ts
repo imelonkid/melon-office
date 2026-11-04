@@ -1,19 +1,22 @@
 // The OA 工作台 on the right: approvals, who is working, who is slacking, the daily report, and settings.
+import layoutData from '../public/assets/layout.json';
 import type { Agent, State } from './types';
 import { net } from './net';
+import { onEmployeeSelected, selectEmployee } from './selection';
 import { ACTIVITY, RECORD, askOf, lineOf, projectOf, rawOf, since } from './copy';
 
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!));
 const KIND_CLASS: Record<string, string> = { edit: 'k-edit', read: 'k-read', search: 'k-read', bash: 'k-bash', web: 'k-web', fail: 'k-fail' };
 
+const characterAssets: Record<string,string> = layoutData.characters;
 function avatar(a: Agent) {
-  return `<div class="avatar" style="background-image:url(assets/chars/${a.cast}.png)"></div>`;
+  return `<div class="avatar" style="background-image:url(assets/illustration/${characterAssets[a.cast]}.png)"></div>`;
 }
 
 function card(a: Agent, now: number, right: string, sub: string, cls = '') {
   const proj = projectOf(a);
   const raw = rawOf(a.raw);
-  return `<div class="card ${cls}">
+  return `<div class="card employee-link ${cls}" data-employee="${esc(a.id)}" role="button" tabindex="0" aria-label="查看${esc(a.name)}的员工档案">
     ${avatar(a)}
     <div class="card-body">
       <div class="card-top"><b>${esc(a.name)}</b><span class="muted">${esc(right || since(a.startedAt, now))}</span></div>
@@ -24,11 +27,38 @@ function card(a: Agent, now: number, right: string, sub: string, cls = '') {
   </div>`;
 }
 
+function profile(a: Agent | undefined, s: State) {
+  const back = '<button class="profile-back" data-profile-back>← 返回工作台</button>';
+  if (!a) return `${back}<div class="empty">这位员工已下班，返回工作台查看其他同事。</div>`;
+  const p = a.profile;
+  const pending = s.pending.filter((item) => item.agentId === a.id);
+  const recent = p?.recent || [];
+  const project = RECORD ? '录屏模式已隐藏' : projectOf(a) || '待分配';
+  return `${back}
+    <article class="employee-badge" aria-label="${esc(a.name)}的员工档案">
+      <div class="badge-clip" aria-hidden="true"></div>
+      <div class="badge-heading"><span>MELON OFFICE</span><b>员工档案</b></div>
+      <div class="badge-identity">${avatar(a)}<div class="badge-identity-text"><h2>${esc(a.name)}</h2>
+        <div class="badge-role">${esc([a.role, a.level].filter(Boolean).join(' · '))}</div>
+        <span class="badge-provider">${esc(p?.source || (a.sessionId ? 'Claude Code' : '待分配'))}</span><div class="badge-department">AI 事业部</div>
+      </div></div>
+      <div class="badge-status ${a.status === 'waiting' ? 'needs-attention' : ''}"><i></i>${esc(p?.status || '在岗')}</div>
+      <dl class="badge-facts"><div class="badge-project"><dt>当前项目</dt><dd>${esc(project)}</dd></div>
+        <div><dt>本次在岗</dt><dd>${esc(p?.tenure || '—')}</dd></div><div><dt>工具调用</dt><dd>${a.toolCalls} 次</dd></div></dl>
+      <div class="badge-task"><b>⌘ 正在做什么</b><p>${esc(lineOf(a))}</p>${rawOf(a.raw) ? `<code>${esc(rawOf(a.raw))}</code>` : ''}</div>
+      <div class="badge-foot"><span>${esc(p?.employment || '员工')} · ${esc(s.settings.officeName)}</span><i aria-hidden="true"></i></div>
+    </article>
+    ${pending.map((item) => `<div class="card ask"><div class="card-body"><b>待你审批</b><div class="profile-ask">${esc(askOf(item))}</div>${item.holding ? `<div class="btns"><button class="ok" data-decide="allow" data-id="${esc(item.id)}">同意</button><button class="no" data-decide="deny" data-id="${esc(item.id)}">驳回</button></div>` : '<div class="muted">请在终端里确认</div>'}</div></div>`).join('')}
+    <h3 class="profile-recent-title">最近动态</h3>
+    ${RECORD ? '<div class="empty">录屏模式：已隐藏项目、命令和历史动态</div>' : recent.length ? `<ol class="profile-timeline">${recent.map((item) => `<li><time>${esc(since(item.t, s.now))}</time><span>${esc(item.text)}</span></li>`).join('')}</ol>` : '<div class="empty">还没有工作动态，等待新任务。</div>'}`;
+}
+
 export function mountPanel(el: HTMLElement) {
   let reportOpen = false;
   let reportFile = '';
   let reportError = '';
   let last: State | undefined;
+  let selected: string | null = null;
 
   // the head and the settings form stay put; only the body below them is re-rendered,
   // so typing in the form isn't wiped by state updates
@@ -87,7 +117,11 @@ export function mountPanel(el: HTMLElement) {
     if (btn) {
       net.decide(btn.dataset.id!, btn.dataset.decide as 'allow' | 'deny');
       btn.closest('.card')?.classList.add('done');
+      return;
     }
+    const employee = t.closest<HTMLElement>('[data-employee]');
+    if (employee) { selectEmployee(employee.dataset.employee!); return; }
+    if (t.closest('[data-profile-back]')) { selectEmployee(null); return; }
     if (t.closest('[data-report]')) makeReport();
     if (t.closest('[data-open-report]')) net.api('/api/report/open').catch(() => {});
     if (t.closest('[data-copy]')) {
@@ -95,6 +129,12 @@ export function mountPanel(el: HTMLElement) {
       navigator.clipboard?.writeText(`${text}\n— ${last?.settings.officeName ?? ''} · 来自 Melon Office`);
       (t.closest('[data-copy]') as HTMLElement).textContent = '已复制';
     }
+  });
+  el.addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    const t = e.target as HTMLElement;
+    if (t.matches('[data-employee]')) { e.preventDefault(); selectEmployee(t.dataset.employee!); }
+    if (t.matches('[data-profile-back]')) { e.preventDefault(); selectEmployee(null); }
   });
   el.addEventListener('click', (e) => {
     const t = e.target as HTMLElement;
@@ -125,13 +165,14 @@ export function mountPanel(el: HTMLElement) {
 
     approvalsBox.checked = s.approvals.enabled;
 
-    const html = `
+    const employee = selected ? byId.get(selected) : undefined;
+    const html = selected ? profile(employee, s) : `
       <div class="section warn">待我审批 · ${waiting.length}</div>
       ${waiting.length ? waiting.map(({ p, a }) => `
-        <div class="card ask">
+        <div class="card ask" data-employee="${esc(a.id)}">
           ${avatar(a)}
           <div class="card-body">
-            <div class="card-top"><b>${esc(a.name)}</b></div>
+            <div class="card-top"><button class="employee-name" data-employee="${esc(a.id)}">${esc(a.name)}</button></div>
             <div class="card-line">想要：${esc(askOf(p))}</div>
             ${p.holding
               ? `<div class="btns"><button class="ok" data-decide="allow" data-id="${p.id}">同意</button><button class="no" data-decide="deny" data-id="${p.id}">驳回</button></div>`
@@ -165,5 +206,11 @@ export function mountPanel(el: HTMLElement) {
     body.innerHTML = html;
   }
 
+  onEmployeeSelected((id) => {
+    selected = id;
+    if (last) render(last);
+    el.scrollTop = 0;
+    if (id) body.querySelector<HTMLElement>('[data-profile-back]')?.focus();
+  });
   net.on(render);
 }

@@ -12,7 +12,8 @@ private extension Dictionary where Key == String, Value == Any {
 }
 
 struct Agent: Equatable {
-    var id, cast, name, role, project, status, kind, tool, line, gist, raw: String
+    var id, cast, name, role, project, status, kind, tool, line, gist, raw, level: String
+    var profile: EmployeeProfile
     var sessionId, activity, partner: String?
     var isSub, resident: Bool
     var seat: Int?
@@ -20,6 +21,8 @@ struct Agent: Equatable {
     var startedAt: Double
 
     init(_ d: [String: Any]) {
+        level = d.str("level")
+        profile = EmployeeProfile(d["profile"] as? [String: Any] ?? [:])
         id = d.str("id"); cast = d.str("cast"); name = d.str("name"); role = d.str("role")
         project = d.str("project"); status = d.str("status"); kind = d.str("kind"); tool = d.str("tool")
         line = d.str("line"); gist = d.str("gist"); raw = d.str("raw")
@@ -30,6 +33,24 @@ struct Agent: Equatable {
     }
 
     var isBusy: Bool { ["working", "thinking", "waiting"].contains(status) }
+}
+
+struct EmployeeProfile: Equatable {
+    struct Event: Equatable, Identifiable {
+        let id: Int
+        let time: Double
+        let text: String
+    }
+    var source, status, tenure, employment: String
+    var recent: [Event]
+
+    init(_ d: [String: Any]) {
+        source = d.str("source"); status = d.str("status")
+        tenure = d.str("tenure"); employment = d.str("employment")
+        recent = d.list("recent").enumerated().map { index, item in
+            Event(id: index, time: item.num("t"), text: item.str("text"))
+        }
+    }
 }
 
 struct Pending: Equatable {
@@ -102,11 +123,31 @@ struct OfficeState: Equatable {
 
 // web/public/assets/layout.json, written by tools/render_assets.py
 struct Layout: Decodable {
+    struct Atlas: Decodable { let columns, rows: Int }
+    struct Foreground: Decodable { let depth: Double; let points: [[Double]] }
+    struct Navigation: Decodable { let nodes: [[Double]]; let next: [[Int]] }
+    let atlas: Atlas
+    let characters: [String: String]
+    let boundary: [[Double]]
+    let foregrounds: [Foreground]
+    let navigation: Navigation
+
+    func route(from: CGPoint, to: CGPoint) -> [CGPoint] {
+        let nodes = navigation.nodes.map { CGPoint(x: $0[0], y: $0[1]) }
+        func nearest(_ p: CGPoint) -> Int {
+            nodes.indices.min { hypot(nodes[$0].x-p.x, nodes[$0].y-p.y) < hypot(nodes[$1].x-p.x, nodes[$1].y-p.y) }!
+        }
+        let start = nearest(from), end = nearest(to)
+        var route = [nodes[start]], current = start
+        while current != end { current = navigation.next[current][end]; route.append(nodes[current]) }
+        return route + [to]
+    }
+
     struct Iso: Decodable { let ox, oy, s: Double }
     struct Seat: Decodable { let id, row: String; let x, y: Double; let anchor: [Double] }
     struct Spots: Decodable {
         let entrance, aisleEast, pantryDoor, rack, boss, cat: [Double]
-        let pantry: [[Double]]
+        let pantry, bossRoute: [[Double]]
         let chat: [[[Double]]]
     }
     struct Wall: Decodable { let banner, clock, projector: [Double] }

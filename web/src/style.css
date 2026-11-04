@@ -1,5 +1,5 @@
 :root {
-  --bg: #0c0c0f;
+  --bg: #000000;
   --panel: #1c1c21;
   --card: #28282e;
   --card-dim: #222227;
@@ -46,7 +46,7 @@ main { flex: 1; min-height: 0; display: flex; gap: 16px; padding: 0 24px 20px; f
 .card.dim { background: var(--card-dim); }
 .card.ask { background: #2c2421; box-shadow: inset 0 0 0 1.5px var(--warn); }
 .card.done { opacity: .45; pointer-events: none; }
-.avatar { width: 40px; height: 40px; flex-shrink: 0; border-radius: 12px; background-color: #34343b; background-repeat: no-repeat; background-size: auto 120px; background-position: -25px -48px; }
+.avatar { width: 40px; height: 40px; flex-shrink: 0; border-radius: 12px; background-color: #34343b; background-repeat: no-repeat; background-size: 600px 450px; background-position: -20px -42px; }
 .card-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
 .card-top { display: flex; justify-content: space-between; gap: 8px; font-size: 13px; }
 .card-top b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -88,4 +88,49 @@ button.gear:hover { color: var(--text); }
 @media (max-width: 760px) {
   #panel { max-width: none; }
   #caption { font-size: 18px; }
+}
+
+/* Employee archive: a compact work badge inside the existing OA sidebar. */
+.employee-link { cursor: pointer; }
+.employee-link:hover { box-shadow: inset 0 0 0 1px #9be29f66; }
+.employee-link:focus-visible, .employee-name:focus-visible, .profile-back:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.employee-name { background: none; color: inherit; padding: 0; min-height: 24px; text-align: left; }
+.profile-back { align-self: flex-start; color: var(--text); background: transparent; padding: 5px 0; margin-bottom: 22px; }
+.employee-badge { position: relative; border-radius: 20px; background: #faf9f5; color: #272637; padding: 25px 18px 18px; border: 1px solid #d7d4dd; box-shadow: inset 0 0 0 5px #f0efec; }
+.badge-clip { position: absolute; width: 38px; height: 12px; background: #292638; border-radius: 8px; top: 10px; left: calc(50% - 19px); }
+.badge-clip::after { content: ''; position: absolute; width: 18px; height: 28px; border-radius: 4px; background: #9bdebb; bottom: 2px; left: 10px; }
+.badge-heading { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 10px 0 18px; }
+.badge-heading span { font-size: 10px; letter-spacing: 1.4px; color: #858392; font-weight: 700; }
+.badge-heading b { font-size: 16px; white-space: nowrap; }
+.badge-identity { display: flex; align-items: center; gap: 14px; padding-bottom: 18px; border-bottom: 1px solid #d7d4dd; }
+.badge-identity .avatar { width: 92px; height: 110px; border-radius: 12px; background-color: #d9eef8; background-size: 1200px 900px; background-position: -40px -84px; image-rendering: pixelated; }
+.badge-identity-text { min-width: 0; }
+.badge-identity h2 { font-size: 25px; line-height: 1.25; overflow-wrap: anywhere; margin: 0 0 5px; }
+.badge-role, .badge-department { color: #747282; font-size: 12px; }
+.badge-provider { display: inline-block; border: 1px solid #9ba7c4; color: #455969; border-radius: 6px; padding: 3px 7px; font-size: 11px; margin: 8px 0; }
+.badge-status { display: inline-flex; align-items: center; gap: 7px; color: #255a40; font-size: 12px; font-weight: 700; padding: 7px 10px; border-radius: 8px; background: #e2f2e7; margin: 16px 0; }
+.badge-status i { width: 8px; height: 8px; border-radius: 50%; background: #388a51; }
+.badge-status.needs-attention { background: #fff0d7; color: #87541c; }
+.badge-status.needs-attention i { background: #b47427; }
+.badge-facts { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin: 0 0 17px; }
+.badge-facts .badge-project { grid-column: 1 / -1; }
+.badge-facts dt { color: #747282; font-size: 11px; margin-bottom: 4px; }
+.badge-facts dd { margin: 0; font-size: 13px; font-weight: 700; overflow-wrap: anywhere; }
+.badge-task { background: #e5f2ec; border-radius: 12px; padding: 12px; }
+.badge-task b { color: #2d654b; font-size: 12px; }
+.badge-task p { margin: 7px 0 0; font-size: 13px; line-height: 1.6; overflow-wrap: anywhere; }
+.badge-task code { display: block; margin-top: 8px; font-size: 10px; white-space: pre-wrap; overflow-wrap: anywhere; color: #586b64; }
+.badge-foot { margin-top: 18px; display: flex; align-items: center; justify-content: space-between; gap: 10px; color: #858392; font-size: 9px; }
+.badge-foot span { min-width: 0; overflow-wrap: anywhere; }
+.badge-foot i { flex: 0 0 56px; height: 16px; background: repeating-linear-gradient(90deg, #898694 0 2px, transparent 2px 4px, #898694 4px 5px, transparent 5px 8px); }
+.profile-recent-title { font-size: 15px; margin: 15px 0 4px; }
+.profile-timeline { list-style: none; padding: 0 0 0 9px; margin: 0; }
+.profile-timeline li { display: flex; align-items: baseline; gap: 12px; border-left: 1px solid #5d596c; padding: 5px 0 17px 15px; position: relative; font-size: 12px; }
+.profile-timeline li::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: #b2e4c9; position: absolute; left: -4px; top: 9px; }
+.profile-timeline time { flex: 0 0 35px; color: var(--muted); font-size: 11px; }
+.profile-timeline span, .profile-ask { overflow-wrap: anywhere; line-height: 1.6; }
+@media (min-width: 980px) {
+  /* A long badge scrolls within the sidebar instead of stretching the canvas. */
+  main { flex-wrap: nowrap; }
+  #panel { min-height: 0; }
 }

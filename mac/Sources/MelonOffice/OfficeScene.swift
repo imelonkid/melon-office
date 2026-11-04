@@ -7,7 +7,6 @@ import SpriteKit
 // `sk()` flips them into SpriteKit's bottom-left space. Floor positions are in floor units (x, y).
 
 private let SPEED: CGFloat = 2.4      // floor units per second
-private let CAT_LANE: CGFloat = 7.9   // open floor between the row-2 desks and the cot, the way to the cat
 
 // monitor-glow color per kind of work, drawn as a halo around the seated employee
 private let GLOW: [String: UInt32] = [
@@ -40,7 +39,7 @@ private final class Character: SKSpriteNode {
         self.cast = cast
         let tex = Assets.shared.frame(cast, "stand")
         super.init(texture: tex, color: .clear, size: Assets.frameSize)
-        anchorPoint = CGPoint(x: 0.5, y: 0.1)
+        anchorPoint = CGPoint(x: 0.5, y: 0.06)
     }
 
     required init?(coder: NSCoder) { fatalError() }
@@ -70,6 +69,7 @@ private final class Worker {
     var agent: Agent
     let sprite: Character
     let glow = SKShapeNode(ellipseOf: CGSize(width: 150, height: 110))
+    let selection = SKShapeNode(ellipseOf: CGSize(width: 100, height: 30))
     let bubble = Bubble()
     var pos: CGPoint
     var place: Target? // nil while walking
@@ -97,6 +97,11 @@ private final class Worker {
         sprite.run(.fadeIn(withDuration: 0.4))
         glow.strokeColor = .clear
         glow.isHidden = true
+        selection.strokeColor = NSColor(hex: 0xB0E0C7)
+        selection.fillColor = .clear
+        selection.lineWidth = 3
+        selection.isHidden = true
+        scene.addChild(selection)
         scene.addChild(glow)
         scene.addChild(sprite)
         scene.addChild(bubble)
@@ -152,7 +157,6 @@ private final class Worker {
     private func go() {
         scene.releaseSpots(self, keep: target)
         let L = scene.layout
-        let lane = CGFloat(L.spots.aisleEast[0])
         var dest = CGPoint.zero
         if target == .chat {
             if let spot = scene.claimChat(self) { dest = spot } else { target = .pantry }
@@ -165,19 +169,7 @@ private final class Worker {
         default: break
         }
 
-        var here = pos
-        var pts: [CGPoint] = []
-        // the cot is in the way: step back out to the open floor before heading anywhere
-        if here.x < lane - 0.5 && here.y > CAT_LANE + 0.05 {
-            here = CGPoint(x: here.x, y: CAT_LANE)
-            pts.append(here)
-        }
-        // ...and come in to the cat the same way
-        let via: [CGPoint] = target == .cat ? [CGPoint(x: dest.x, y: CAT_LANE)] : []
-        let aim = via.first ?? dest
-        if abs(here.x - lane) > 0.05 && abs(here.y - aim.y) > 0.05 { pts.append(CGPoint(x: lane, y: here.y)) }
-        if abs(here.y - aim.y) > 0.05 { pts.append(CGPoint(x: lane, y: aim.y)) }
-        pts += via + [dest]
+        let pts = scene.layout.route(from: pos, to: dest)
 
         place = nil
         glow.isHidden = true
@@ -211,7 +203,7 @@ private final class Worker {
         if target == .exit {
             removed = true
             let fade = SKAction.sequence([.fadeOut(withDuration: 0.5), .removeFromParent()])
-            sprite.run(fade); bubble.run(fade); glow.removeFromParent()
+            sprite.run(fade); bubble.run(fade); glow.removeFromParent(); selection.removeFromParent()
             scene.forget(self)
             return
         }
@@ -226,7 +218,7 @@ private final class Worker {
         if place == .seat {
             guard let s = seat else { return }
             sprite.position = scene.sk(CGPoint(x: s.anchor[0], y: s.anchor[1]))
-            sprite.zPosition = s.row == "row1" ? 10 : 30
+            sprite.zPosition = s.y * scene.layout.iso.s
             if a.status == "slacking" && a.activity != "fake" {
                 glow.isHidden = true
                 sprite.play("phone")
@@ -264,9 +256,12 @@ private final class Worker {
         } else if agent.status == "idle" && place == .seat && now() - idleSince > 5000 {
             decide()
         }
+        selection.position = scene.sk(scene.project(pos.x, pos.y))
+        selection.zPosition = sprite.zPosition - 0.1
+        selection.isHidden = scene.store.selectedEmployeeId != agent.id
         let a = agent
         let page = scene.page(sprite.position)
-        let lift: CGFloat = place == .seat ? 122 : 150
+        let lift: CGFloat = place == .seat ? 105 : 125
         bubble.px = page.x
         bubble.py = page.y - lift - 4 * CGFloat(sin(time / 450 + phase))
         let variant: Bubble.Variant = a.status == "waiting" ? .ask : (a.status == "working" && a.kind == "bash") ? .term : .say
@@ -317,48 +312,48 @@ final class OfficeScene: SKScene {
 
     func project(_ x: CGFloat, _ y: CGFloat, _ z: CGFloat = 0) -> CGPoint {
         let iso = layout.iso
-        return CGPoint(x: iso.ox + (x - y) * iso.s, y: iso.oy + (x + y) * iso.s / 2 - z * iso.s)
+        return CGPoint(x: iso.ox + x * iso.s, y: iso.oy + y * iso.s - z * iso.s)
     }
 
     // painter's order for anyone standing / walking on the floor
     func depthFor(_ x: CGFloat, _ y: CGFloat) -> CGFloat {
-        if x > 9 { return 50 + y }
-        if y < 2.2 { return 15 }  // behind row-1 desks
-        if y < 4.3 { return 25 }  // between the rows
-        if y < 5.4 { return 35 }  // behind row-2 desks
-        return 50 + y
+        y * layout.iso.s
     }
 
     override func didMove(to view: SKView) {
         guard !built else { return }
         built = true
         let A = Assets.shared
-        func layer(_ key: String, _ z: CGFloat) -> SKSpriteNode {
-            let n = SKSpriteNode(texture: A.images[key], size: size)
+        func layer(_ points: [[Double]], _ z: CGFloat) {
+            let n = SKSpriteNode(texture: A.images["illustration"], size: size)
             n.anchorPoint = CGPoint(x: 0, y: 1)
             n.position = CGPoint(x: 0, y: size.height)
-            n.zPosition = z
-            addChild(n)
-            return n
+            let path = CGMutablePath()
+            for (index, point) in points.enumerated() {
+                let p = sk(CGPoint(x: point[0], y: point[1]))
+                if index == 0 { path.move(to: p) } else { path.addLine(to: p) }
+            }
+            path.closeSubpath()
+            let mask = SKShapeNode(path: path)
+            mask.fillColor = .white; mask.strokeColor = .clear
+            let crop = SKCropNode()
+            crop.maskNode = mask; crop.zPosition = z; crop.addChild(n)
+            addChild(crop)
         }
-        _ = layer("bg_a", 0)
-        let bgB = layer("bg_b", 0.1)
-        bgB.alpha = 0
-        bgB.run(.repeatForever(.sequence([.wait(forDuration: 0.7), .run { bgB.alpha = bgB.alpha > 0 ? 0 : 1 }])))
-        _ = layer("row1", 20)
-        _ = layer("row2", 40)
+        layer(layout.boundary, 0)
+        for foreground in layout.foregrounds { layer(foreground.points, foreground.depth) }
 
         wall.anchorPoint = CGPoint(x: 0, y: 1)
         wall.position = CGPoint(x: 0, y: size.height)
-        wall.zPosition = 0.2
+        wall.zPosition = 1
         addChild(wall)
         drawWall()
-        run(.repeatForever(.sequence([.wait(forDuration: 20), .run { [weak self] in self?.drawWall() }])))
+        run(.repeatForever(.sequence([.wait(forDuration: 1), .run { [weak self] in self?.drawWall() }])))
 
         bossPos = CGPoint(x: layout.spots.boss[0], y: layout.spots.boss[1])
         boss.position = sk(project(bossPos.x, bossPos.y))
-        boss.zPosition = 60
-        boss.play("stand")
+        boss.zPosition = depthFor(bossPos.x, bossPos.y)
+        boss.play("think")
         addChild(boss)
         addChild(bossBubble)
         var i = 0
@@ -380,31 +375,13 @@ final class OfficeScene: SKScene {
         ctx.scaleBy(x: 1, y: -1)
         NSGraphicsContext.saveGraphicsState()
         NSGraphicsContext.current = NSGraphicsContext(cgContext: ctx, flipped: true)
-        let s = layout.iso.s
-        func skewed(_ at: [Double], _ draw: () -> Void) {
-            ctx.saveGState()
-            ctx.concatenate(CGAffineTransform(a: 1, b: 0.5, c: 0, d: 1, tx: at[0], ty: at[1])) // wall A runs along floor x
-            draw()
-            ctx.restoreGState()
-        }
-        func text(_ str: String, _ font: NSFont, _ color: UInt32, center: CGPoint? = nil, topLeft: CGPoint? = nil) {
-            let t = NSAttributedString(string: str, attributes: [.font: font, .foregroundColor: NSColor(hex: color)])
-            let sz = t.size()
-            let origin = center.map { CGPoint(x: $0.x - sz.width / 2, y: $0.y - sz.height / 2) } ?? topLeft ?? .zero
-            t.draw(at: origin)
-        }
-        skewed(layout.wall.banner) {
-            text("拥 抱 变 化  ·  使 命 必 达", Fonts.heavy(25), 0xFFE9A8, center: CGPoint(x: 6.9 * s / 2, y: 0.57 * s / 2))
-        }
-        let d = Date()
-        let cal = Calendar.current
-        skewed(layout.wall.clock) {
-            text(String(format: "%02d:%02d", cal.component(.hour, from: d), cal.component(.minute, from: d)),
-                 Fonts.mono(24, bold: true), 0xFF8A5E, center: CGPoint(x: 1.2 * s / 2, y: 0.6 * s / 2))
-        }
-        skewed(layout.wall.projector) {
-            text("Q4 增长复盘", Fonts.ui(18, bold: true), 0x2A2440, topLeft: CGPoint(x: 0, y: 6))
-        }
+        let at = layout.wall.clock
+        ctx.concatenate(CGAffineTransform(a: 1, b: -0.55, c: 0, d: 1, tx: at[0], ty: at[1]))
+        let d = Date(), cal = Calendar.current
+        let value = String(format: "%02d:%02d", cal.component(.hour, from: d), cal.component(.minute, from: d))
+        let text = NSAttributedString(string: value, attributes: [.font: Fonts.mono(24, bold: true), .foregroundColor: NSColor(hex: 0xBCE6D2)])
+        let textSize = text.size()
+        text.draw(at: CGPoint(x: 40 - textSize.width / 2, y: 18 - textSize.height / 2))
         NSGraphicsContext.restoreGraphicsState()
         guard let img = ctx.makeImage() else { return }
         wall.texture = SKTexture(cgImage: img)
@@ -481,9 +458,9 @@ final class OfficeScene: SKScene {
     private func walkBoss(_ goal: String) {
         if goal == bossGoal { return }
         bossGoal = goal
-        let route = [CGPoint(x: 9.3, y: 3.5), CGPoint(x: 9.3, y: 3.0), CGPoint(x: 8.6, y: 3.0), CGPoint(x: 8.6, y: 3.75), CGPoint(x: 5.2, y: 3.75)]
+        let route = layout.spots.bossRoute.map { CGPoint(x: $0[0], y: $0[1]) }
         let r = layout.spots.boss
-        bossPath = goal == "floor" ? route : route.dropLast().reversed() + [CGPoint(x: r[0], y: 3.5), CGPoint(x: r[0], y: r[1])]
+        bossPath = goal == "floor" ? route : route.dropLast().reversed() + [CGPoint(x: r[0], y: r[1])]
         bossLastStep = now()
         boss.play("walk")
     }
@@ -510,7 +487,7 @@ final class OfficeScene: SKScene {
         boss.zPosition = depthFor(bossPos.x, bossPos.y)
         if bossPath.isEmpty {
             boss.flipped = false
-            boss.play(bossGoal == "floor" ? "scold" : "stand")
+            boss.play(bossGoal == "floor" ? "scold" : "think")
         }
     }
 
@@ -533,7 +510,7 @@ final class OfficeScene: SKScene {
         }
         let bp = page(boss.position)
         bossBubble.px = bp.x + shake
-        bossBubble.py = bp.y - 150 - 4 * CGFloat(sin(time / 500))
+        bossBubble.py = bp.y - 125 - 4 * CGFloat(sin(time / 500))
         bossBubble.show(name: "瓜老板（你）", cast: "boss", text: line, variant: variant)
         unstack()
     }
@@ -559,10 +536,25 @@ final class OfficeScene: SKScene {
 
     override func mouseDown(with event: NSEvent) {
         let p = event.location(in: self)
-        for b in workers.values.map(\.bubble) {
+        let visible = workers.values.filter { !$0.bubble.isHidden && $0.bubble.alpha > 0 }
+        // Approval controls take priority over profile navigation.
+        for worker in visible {
+            let b = worker.bubble
             let local = convert(p, to: b)
             if let hit = b.buttons.first(where: { $0.rect.contains(local) }) {
                 store.decide(hit.id, hit.behavior)
+                return
+            }
+        }
+        for worker in visible {
+            if worker.bubble.nameFrame.contains(convert(p, to: worker.bubble)) {
+                store.selectEmployee(worker.agent.id)
+                return
+            }
+        }
+        for worker in workers.values.sorted(by: { $0.sprite.zPosition > $1.sprite.zPosition }) {
+            if !worker.sprite.isHidden && worker.sprite.alpha > 0.1 && worker.sprite.frame.contains(p) {
+                store.selectEmployee(worker.agent.id)
                 return
             }
         }
