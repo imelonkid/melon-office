@@ -2,7 +2,7 @@
 
 # Melon Office
 
-**Your Claude Code sessions, as a tiny big-tech office.**
+**Your Claude Code and Codex sessions, as a tiny big-tech office.**
 
 Every session is an employee. They type away at dual monitors, raise a hand when they need your approval,
 and sneak off to the pantry for coffee the moment the job is done. You're the boss.
@@ -47,6 +47,22 @@ And it's a lot of fun to watch.
 > The office copy is written in Chinese big-tech slang (拥抱变化, 拉通对齐, the 10 pm taxi-reimbursement countdown…). An English copy pack is on the roadmap.
 
 ## Quick start
+
+### Connect Codex
+
+On Mac, enable Codex in Settings → 接入. With the CLI already installed, run:
+
+```bash
+melon-office init --provider codex
+melon-office status --provider codex
+melon-office uninstall --provider codex  # leaves Claude Code connected
+```
+
+Then **review and trust** the new hooks in Codex Settings → Hooks or CLI `/hooks`, and start a new session. The switch reports configuration, not trust. This supports local Codex CLI and desktop sessions with official hooks, not cloud execution. It does not read transcripts, credentials or model settings. See the [official Codex hooks documentation](https://learn.chatgpt.com/docs/hooks).
+
+Both providers can run in the same office with independent connections. Even identical project/session IDs get different employees; source appears on the badge, never appended to names. Codex starts disabled and existing Claude choices are preserved. Patches use edit activity; interruptions pause work without counting a delivery. If approval times out, office approvals are off, or the office is unavailable, Codex handles its own approval.
+
+Codex uses `~/.codex/hooks.json` (or `CODEX_HOME`). `--project` uses the current project's `.codex/hooks.json`; `--no-approvals` keeps decisions in the original app. Only Melon Office hooks are changed, existing files are backed up, and trust records are never modified. Updated hooks require another review.
 
 One line. Requires Node 18+, git and Claude Code (macOS or Linux).
 
@@ -107,7 +123,7 @@ A native macOS version lives in [`mac/`](mac): a menu bar app that runs the offi
 - **Approval notifications**: requests show up as macOS notifications with 同意 / 驳回 buttons, so the office can hold them even with no window open.
 - **Desk widget**: an always-on-top, transparent mini office for a corner of your screen. Clicks pass through the empty corners.
 - **Compact menu and settings**: the menu keeps Open Office, Desk Widget, Settings, Check for Updates and Quit. Widget size, resident staff and recording mode live in Settings → 工区; login, office name and report directory in 通用; connections and approvals in 接入.
-- **Opt-in Claude Code connection**: on first launch it asks once whether to add its hooks. Every launch checks them: hooks left by an older version (or a different port) are updated in place, keeping your approval choice. If you declined or disconnected it, it won't ask again; Settings → 接入 reconnects it. Existing choices are preserved and new sources are not enabled by default. Codex is marked unavailable and does not collect sessions yet.
+- **Independent Claude Code and Codex connections**: first launch asks once about Claude Code and preserves the choice; existing hooks are updated in place. Codex is a separate, initially disabled switch in Settings → 接入. Review and trust it in Codex after enabling. Both sources share the office, approval controls and recording rules while keeping separate employees.
 - **Native rendering**: the office is drawn with SpriteKit and the OA panel with SwiftUI, from the same art as the web version.
 - **Same brain**: `server/office.mjs`, `translate.mjs` and `hooks-config.mjs` run inside JavaScriptCore, and the app serves the same hook endpoints on port 7777, so the hooks and the browser version work unchanged. Don't run the CLI and the app at the same time.
 

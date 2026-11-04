@@ -3,6 +3,7 @@
 // `native` is provided by Swift (MelonCore.swift): timers, files, and callbacks back into the app.
 import { Office } from '../../server/office.mjs';
 import { install, uninstall, status, check, repair } from '../../server/hooks-config.mjs';
+import { hookEvent } from '../../server/hook-events.mjs';
 
 let office;
 let clients = 0;
@@ -28,15 +29,17 @@ function start(staff) {
 globalThis.MelonCore = {
   start,
   // passive hook events (a PermissionRequest sent here is only displayed)
-  hook(json) {
-    const evt = JSON.parse(json);
+  hook(json, provider = 'claude') {
+    const evt = hookEvent(JSON.parse(json), provider);
     if (evt.hook_event_name === 'PermissionRequest') office.requestPermission(evt, { hold: false });
     else office.handle(evt);
+    return true;
   },
   // the http PermissionRequest hook: calls native.permissionDone(ticket, 'allow' | 'deny' | '') when settled
-  permission(json, ticket) {
-    office.requestPermission(JSON.parse(json), { hold: office.canHold() })
+  permission(json, ticket, provider = 'claude') {
+    office.requestPermission(hookEvent(JSON.parse(json), provider, 'PermissionRequest'), { hold: office.canHold() })
       .then((d) => native.permissionDone(ticket, d || ''));
+    return true;
   },
   decide: (id, behavior) => office.decide(id, behavior),
   setApprovals(enabled) { office.approvals.enabled = Boolean(enabled); office.changed(); },
@@ -46,12 +49,12 @@ globalThis.MelonCore = {
   // settings: { officeName, reportDir } (shared with the CLI version via ~/.config/melon-office/settings.json)
   setSettings: (json) => JSON.stringify(office.setSettings(JSON.parse(json))),
   saveReport: () => office.saveReport(),
-  hooksInstall: (port, approvals) => JSON.stringify(install({ port, approvals })),
-  hooksUninstall: () => JSON.stringify(uninstall()),
-  hooksStatus: () => JSON.stringify(status()),
+  hooksInstall: (port, approvals, provider = 'claude', codexHome) => JSON.stringify(install({ port, approvals, provider, codexHome })),
+  hooksUninstall: (provider = 'claude', codexHome) => JSON.stringify(uninstall({ provider, codexHome })),
+  hooksStatus: (provider = 'claude', codexHome) => JSON.stringify(status({ provider, codexHome })),
   // launch-time reconcile: { state: none | current | stale | unreadable, approvals, repaired }
-  hooksCheck: (port) => JSON.stringify(check({ port })),
-  hooksRepair: (port) => JSON.stringify(repair({ port })),
+  hooksCheck: (port, provider = 'claude', codexHome) => JSON.stringify(check({ port, provider, codexHome })),
+  hooksRepair: (port, provider = 'claude', codexHome) => JSON.stringify(repair({ port, provider, codexHome })),
 };
 
 // keep "x 分钟" style timers fresh even when nothing happens

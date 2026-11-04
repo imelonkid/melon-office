@@ -11,7 +11,7 @@ final class MelonCore {
     var onState: ((String) -> Void)?
     var onPermissionDone: ((Int, String) -> Void)?
 
-    init(script: String) {
+    init(script: String, homeDirectory: String = NSHomeDirectory()) {
         ctx.exceptionHandler = { _, err in NSLog("[melon core] %@", err?.toString() ?? "?") }
         let native = JSValue(newObjectIn: ctx)!
         func expose(_ name: String, _ block: Any) {
@@ -40,14 +40,25 @@ final class MelonCore {
 
         // files, for hooks-config.mjs
         let fm = FileManager.default
-        let fileExists: @convention(block) (String) -> Bool = { fm.fileExists(atPath: $0) }
-        let readFile: @convention(block) (String) -> String = { (try? String(contentsOfFile: $0, encoding: .utf8)) ?? "" }
-        let writeFile: @convention(block) (String, String) -> Void = { path, text in
-            do { try text.write(toFile: path, atomically: true, encoding: .utf8) } catch { NSLog("[melon core] write %@: %@", path, "\(error)") }
+        func fileError(_ error: Error) {
+            let context = JSContext.current()!
+            context.exception = JSValue(newErrorFromMessage: error.localizedDescription, in: context)
         }
-        let mkdirp: @convention(block) (String) -> Void = { try? fm.createDirectory(atPath: $0, withIntermediateDirectories: true) }
-        let copyFile: @convention(block) (String, String) -> Void = { try? fm.copyItem(atPath: $0, toPath: $1) }
-        let homedir: @convention(block) () -> String = { NSHomeDirectory() }
+        let fileExists: @convention(block) (String) -> Bool = { fm.fileExists(atPath: $0) }
+        let readFile: @convention(block) (String) -> String = { path in
+            do { return try String(contentsOfFile: path, encoding: .utf8) }
+            catch { fileError(error); return "" } // JS exception prevents this value from being consumed.
+        }
+        let writeFile: @convention(block) (String, String) -> Void = { path, text in
+            do { try text.write(toFile: path, atomically: true, encoding: .utf8) } catch { fileError(error) }
+        }
+        let mkdirp: @convention(block) (String) -> Void = { path in
+            do { try fm.createDirectory(atPath: path, withIntermediateDirectories: true) } catch { fileError(error) }
+        }
+        let copyFile: @convention(block) (String, String) -> Void = { source, destination in
+            do { try fm.copyItem(atPath: source, toPath: destination) } catch { fileError(error) }
+        }
+        let homedir: @convention(block) () -> String = { homeDirectory }
 
         expose("setTimer", setTimer)
         expose("clearTimer", clearTimer)
@@ -76,8 +87,9 @@ final class MelonCore {
     }
 
     func start(staff: Int) { call("start", [staff]) }
-    func hook(_ json: String) { call("hook", [json]) }
-    func permission(_ json: String, ticket: Int) { call("permission", [json, ticket]) }
+    @discardableResult
+    func hook(_ json: String, provider: String = "claude") -> Bool { call("hook", [json, provider])?.toBool() ?? false }
+    func permission(_ json: String, ticket: Int, provider: String = "claude") -> Bool { call("permission", [json, ticket, provider])?.toBool() ?? false }
     func decide(_ id: String, _ behavior: String) { call("decide", [id, behavior]) }
     func setApprovals(_ enabled: Bool) { call("setApprovals", [enabled]) }
     func setClients(_ n: Int) { call("setClients", [n]) }
@@ -90,12 +102,13 @@ final class MelonCore {
     }
     func saveReport() -> String? { call("saveReport")?.toString() }
 
-    // Claude Code hooks in ~/.claude/settings.json
-    func hooksInstall(port: Int, approvals: Bool) -> [String: Any] { callJSON("hooksInstall", [port, approvals]) }
-    func hooksUninstall() -> [String: Any] { callJSON("hooksUninstall") }
-    func hooksEvents() -> [String] { callJSON("hooksStatus")["events"] as? [String] ?? [] }
+    // Codex uses its own hooks.json, never auth.json or config.toml.
+    private var codexHome: String { ProcessInfo.processInfo.environment["CODEX_HOME"] ?? "" }
+    func hooksInstall(port: Int, approvals: Bool, provider: String = "claude") -> [String: Any] { callJSON("hooksInstall", [port, approvals, provider, codexHome]) }
+    func hooksUninstall(provider: String = "claude") -> [String: Any] { callJSON("hooksUninstall", [provider, codexHome]) }
+    func hooksEvents(provider: String = "claude") -> [String] { callJSON("hooksStatus", [provider, codexHome])["events"] as? [String] ?? [] }
     /// "none" | "current" | "stale" | "unreadable" (see hooks-config.mjs check())
-    func hooksState(port: Int) -> String { callJSON("hooksCheck", [port])["state"] as? String ?? "unreadable" }
+    func hooksState(port: Int, provider: String = "claude") -> String { callJSON("hooksCheck", [port, provider, codexHome])["state"] as? String ?? "unreadable" }
     /// updates stale hooks in place, keeping whether approvals were connected; true if it changed anything
-    func hooksRepair(port: Int) -> Bool { callJSON("hooksRepair", [port])["repaired"] as? Bool ?? false }
+    func hooksRepair(port: Int, provider: String = "claude") -> Bool { callJSON("hooksRepair", [port, provider, codexHome])["repaired"] as? Bool ?? false }
 }

@@ -91,16 +91,22 @@ final class OfficeServer {
     private func route(_ conn: Connection, _ req: Request) {
         let path = req.path
         switch (req.method, path) {
-        case ("POST", "/hook"):
-            if let body = String(data: req.body, encoding: .utf8), isJSONObject(req.body) { core.hook(body) }
+        case ("POST", "/hook"), ("POST", "/hook/codex"):
+            guard let body = String(data: req.body, encoding: .utf8), isJSONObject(req.body),
+                  core.hook(body, provider: path == "/hook/codex" ? "codex" : "claude") else {
+                return conn.respond(400, json: #"{"error":"invalid hook"}"#)
+            }
             return conn.respond(200, json: "{}")
-        case ("POST", "/hook/permission"):
+        case ("POST", "/hook/permission"), ("POST", "/hook/codex/permission"):
             guard let body = String(data: req.body, encoding: .utf8), isJSONObject(req.body) else {
                 return conn.respond(400, json: #"{"error":"bad json"}"#)
             }
             nextTicket += 1
             waiting[nextTicket] = conn
-            core.permission(body, ticket: nextTicket)
+            if !core.permission(body, ticket: nextTicket, provider: path == "/hook/codex/permission" ? "codex" : "claude") {
+                waiting.removeValue(forKey: nextTicket)
+                conn.respond(400, json: #"{"error":"invalid permission hook"}"#)
+            }
             return
         case ("GET", "/ws"):
             guard req.isLocal, let key = req.headers["sec-websocket-key"], req.headers["upgrade"]?.lowercased() == "websocket" else {

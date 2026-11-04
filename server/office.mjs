@@ -50,7 +50,7 @@ const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
 const pad2 = (n) => String(n).padStart(2, '0');
 
 export function classify(tool = '') {
-  if (/^(Edit|Write|MultiEdit|NotebookEdit)$/.test(tool)) return 'edit';
+  if (/^(Edit|Write|MultiEdit|NotebookEdit|apply_patch)$/.test(tool)) return 'edit';
   if (tool === 'Read') return 'read';
   if (/^(Grep|Glob|LS)$/.test(tool)) return 'search';
   if (/^(Bash|BashOutput|KillShell|KillBash|Monitor)$/.test(tool)) return 'bash';
@@ -127,7 +127,7 @@ export class Office extends EventEmitter {
   blank(id, cast, patch) {
     const now = Date.now();
     return {
-      id, sessionId: null, isSub: false, resident: false, parentName: null,
+      id, sessionId: null, provider: null, isSub: false, resident: false, parentName: null,
       cast: cast.key, name: cast.name, role: cast.role, level: cast.level,
       project: '', seat: null, status: 'thinking', kind: 'think', tool: '', detail: '',
       line: '', gist: '', raw: '', activity: null, partner: null, slackUntil: 0, slackSince: 0,
@@ -143,7 +143,9 @@ export class Office extends EventEmitter {
 
   ensure(evt) {
     const sid = evt.session_id;
-    const key = evt.agent_id ? `${sid}:${evt.agent_id}` : sid;
+    const provider = evt.provider || 'claude';
+    const rootKey = JSON.stringify([provider, sid]);
+    const key = evt.agent_id ? JSON.stringify([provider, sid, evt.agent_id]) : rootKey;
     const known = this.agents.get(this.links.get(key));
     if (known) return known;
 
@@ -151,7 +153,9 @@ export class Office extends EventEmitter {
     const isSub = Boolean(evt.agent_id);
     // the same job goes back to the same person: whoever had this session before (resumed),
     // else whoever worked in this project last. If they're busy, someone else takes it.
-    const bySession = isSub ? null : this.memory.forSession(sid);
+    // Retain existing Claude memory keys; Codex has a separate namespace.
+    const memoryKey = provider === 'claude' ? sid : rootKey;
+    const bySession = isSub ? null : this.memory.forSession(memoryKey);
     const owner = bySession || (isSub ? null : this.memory.forProject(evt.cwd));
     const welcomeBack = bySession ? '接着上次的活干' : '这个项目我熟，我来';
     // a resident with nothing to do takes the job; subagents are always fresh interns
@@ -163,13 +167,13 @@ export class Office extends EventEmitter {
     if (a) {
       this.stopSlacking(a);
       const line = owner && a.cast === owner ? welcomeBack : '来活了，放下手机';
-      this.set(a, { sessionId: sid, project, status: 'thinking', kind: 'think', tool: '', detail: '', toolCalls: 0, startedAt: Date.now(), line });
+      this.set(a, { sessionId: sid, provider, project, status: 'thinking', kind: 'think', tool: '', detail: '', toolCalls: 0, startedAt: Date.now(), line });
     } else {
-      const parent = isSub ? this.agents.get(this.links.get(sid)) : null;
+      const parent = isSub ? this.agents.get(this.links.get(rootKey)) : null;
       const cast = this.hire(isSub, owner);
       const line = isSub ? `实习生报到，跟着${parent?.name || '组长'}干` : owner && cast.key === owner ? welcomeBack : '新同学入职，先熟悉一下项目';
       a = this.blank(key, cast, {
-        sessionId: sid, isSub: Boolean(evt.agent_id), parentName: parent?.name || null,
+        sessionId: sid, provider, isSub: Boolean(evt.agent_id), parentName: parent?.name || null,
         project, seat: this.freeSeat(), line, gist: line,
       });
       this.agents.set(a.id, a);
@@ -178,7 +182,7 @@ export class Office extends EventEmitter {
     if (!isSub && CAST.some((c) => c.key === a.cast)) { // not the numbered 外包
       // helping out while the owner is busy elsewhere doesn't make you the project's owner
       const ownerBusy = owner && owner !== a.cast && [...this.agents.values()].some((x) => x.cast === owner && x.sessionId);
-      this.memory.remember(sid, evt.cwd, a.cast, { project: !ownerBusy });
+      this.memory.remember(memoryKey, evt.cwd, a.cast, { project: !ownerBusy });
     }
     this.log(a, a.line);
     return a;
@@ -192,7 +196,7 @@ export class Office extends EventEmitter {
   startSlacking(a, line) {
     this.clearPending(a);
     this.unlink(a);
-    this.set(a, { sessionId: null, project: '', status: 'slacking', kind: 'idle', tool: '', detail: '', toolCalls: 0, startedAt: Date.now(), slackSince: Date.now() });
+    this.set(a, { sessionId: null, provider: null, project: '', status: 'slacking', kind: 'idle', tool: '', detail: '', toolCalls: 0, startedAt: Date.now(), slackSince: Date.now() });
     this.pickActivity(a);
     if (line) this.set(a, { line });
   }
@@ -302,7 +306,7 @@ export class Office extends EventEmitter {
     if (!evt || !evt.session_id || !evt.hook_event_name) return;
     const ev = evt.hook_event_name;
     if (ev === 'SessionEnd') {
-      const team = [...this.agents.values()].filter((x) => x.sessionId === evt.session_id && x.status !== 'leaving');
+      const team = [...this.agents.values()].filter((x) => x.sessionId === evt.session_id && x.provider === (evt.provider || 'claude') && x.status !== 'leaving');
       for (const x of team) {
         if (x.resident) {
           this.log(x, '活干完了，回去摸鱼');
@@ -355,6 +359,14 @@ export class Office extends EventEmitter {
         this.clearPending(a);
         this.set(a, { status: 'idle', kind: 'idle', tool: '', detail: '', line: pick(['交付了，等你验收', '搞定，带薪喝杯咖啡', '闭环了，去茶水间回回血']) });
         this.log(a, '交付');
+        break;
+      case 'Interrupt':
+        this.clearPending(a);
+        this.set(a, { status: 'idle', kind: 'idle', tool: '', detail: '', line: '任务已暂停，等你安排' });
+        this.log(a, '任务中断');
+        break;
+      case 'PostCompact':
+        this.set(a, { status: 'thinking', kind: 'think', line: '整理完工位，继续' });
         break;
       case 'SubagentStart':
         // the subagent itself is created by ensure() when agent_id is present

@@ -90,6 +90,10 @@ Dock 图标由 `mac/make_icon.py` 用纯色色块生成（Python 3 + Pillow + ma
 
 运行时插画原稿和 6×3 角色动画图集位于 `web/public/assets/illustration/`。`npm run assets` 运行 `tools/build_illustrated_layout.mjs`，只重建座位、前景裁切多边形和全连通过道导航，不改原图。网页和 Mac 使用同一份 `layout.json`。`tools/render_assets.py` 保留为早期程序绘图工具，不再用于正式场景。
 
-当前场景采用浅米黄墙面、偏灰地板，工区外保持纯黑。Mac 菜单只保留高频入口；设置中的本机选项通过 `OfficeStore.desktop` 读取实际状态，写操作仍由 `AppDelegate` 调用原有实现。Claude 接入开关以 hooks 检查结果为准，不按勾选的默认值自动写配置；Codex 未实现采集前仅显示不可用说明。验收接入开关使用临时 HOME，不修改日常配置。
+当前场景采用浅米黄墙面、偏灰地板，工区外保持纯黑。Mac 菜单只保留高频入口；设置中的本机选项通过 `OfficeStore.desktop` 读取实际状态，写操作由 `AppDelegate` 调用。Claude Code 与 Codex 各自读取 hooks 配置状态，不按勾选的默认值自动安装。验收接入使用临时 HOME，不修改日常配置。
+
+Codex 通过官方 hooks.json 发送事件，配置读写和状态机与 Node 版共用。`/hook/codex` 与 `/hook/codex/permission` 在 Node / Swift 两个桥接端保持一致；`hook-events.mjs` 在边界校验载荷，提供可信来源。内部按来源、会话及子 Agent ID 建键，Claude 的历史记忆键保持不变。Codex 的原配置与登录、模型、信任记录不得改动，配置写入后必须由用户在 Codex 内审核并信任；更新端口/命令后需重新审核。本次按本机 `codex-cli 0.166.0` 和 [官方文档](https://learn.chatgpt.com/docs/hooks) 验证能力，不支持没有本机 hooks 的云端会话。
+
+`test/codex.test.mjs` 覆盖独立安装/移除、备份、端口修复、混合会话/子 Agent、审批隔离、中断与实际生成命令的 HTTP 往返。Mac 验收须使用 `MelonCore(script:homeDirectory:)` 注入临时目录，并把测试进程的 `CODEX_HOME` 指向临时目录，禁止测试真实配置。
 
 换素材须重新量取座位锚点、桌沿遮挡和通道，不能把包含员工的展示图直接作为背景。时钟由运行时覆盖；工位、玻璃办公室、茶水间与行政猫保持在原稿位置。角色帧顺序保留工作、举手、走路、喝咖啡、刷手机、聊天、撸猫及训话动作；访客复用同风格角色图集。检查 `test/office-behavior.test.mjs`，并验收两端的遮挡、寻路、审批及工卡。

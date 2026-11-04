@@ -7,10 +7,12 @@ struct DesktopPreferences {
     var widgetWidth: CGFloat = 520
     var launchAtLogin = false
     var claudeState = "none"
+    var codexState = "none"
     var problem: String?
     var version = ""
 
     var claudeConnected: Bool { claudeState == "current" || claudeState == "stale" }
+    var codexConnected: Bool { codexState == "current" || codexState == "stale" }
 }
 
 /// The latest office state plus the few things the UI can do, shared by the window, the widget and the menu.
@@ -42,6 +44,7 @@ final class OfficeStore: ObservableObject {
     var setResidentStaff: (Int) -> Void = { _ in }
     var setWidgetWidth: (CGFloat) -> Void = { _ in }
     var setClaudeConnected: (Bool) -> Void = { _ in }
+    var setCodexConnected: (Bool) -> Void = { _ in }
     var setLaunchAtLogin: (Bool) -> Void = { _ in }
     var setRecord: (Bool) -> Void = { _ in }
 

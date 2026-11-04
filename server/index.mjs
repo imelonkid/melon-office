@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { WebSocketServer } from 'ws';
 import { spawn } from 'node:child_process';
 import { Office } from './office.mjs';
+import { hookEvent } from './hook-events.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const DIST = path.resolve(here, '..', 'dist');
@@ -73,8 +74,8 @@ export async function startServer({ port = 7777, host = '127.0.0.1', demo = fals
   const server = http.createServer(async (req, res) => {
     const { pathname } = new URL(req.url, 'http://x');
     try {
-      if (req.method === 'POST' && pathname === '/hook') {
-        const evt = await readBody(req);
+      if (req.method === 'POST' && (pathname === '/hook' || pathname === '/hook/codex')) {
+        const evt = hookEvent(await readBody(req), pathname === '/hook/codex' ? 'codex' : 'claude');
         if (evt.hook_event_name === 'PermissionRequest') {
           // installed as a passive hook too? just display it
           office.requestPermission(evt, { hold: false });
@@ -83,8 +84,8 @@ export async function startServer({ port = 7777, host = '127.0.0.1', demo = fals
         }
         return json(res, 200, {});
       }
-      if (req.method === 'POST' && pathname === '/hook/permission') {
-        const evt = await readBody(req);
+      if (req.method === 'POST' && (pathname === '/hook/permission' || pathname === '/hook/codex/permission')) {
+        const evt = hookEvent(await readBody(req), pathname === '/hook/codex/permission' ? 'codex' : 'claude', 'PermissionRequest');
         const decision = await office.requestPermission(evt, { hold: office.canHold() });
         if (!decision) return json(res, 200, {});
         return json(res, 200, { hookSpecificOutput: { hookEventName: 'PermissionRequest', decision: { behavior: decision } } });

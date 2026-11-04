@@ -1,24 +1,26 @@
 # melon-office
 
-把 Claude Code 会话画成一层大厂工区的可视化工具：每个会话是一个员工，干活、举手要审批、去茶水间摸鱼。给同时开好几个 Claude Code 会话的人用。**公开仓库**。
+把 Claude Code 与 Codex 的本机会话画成一层大厂工区的可视化工具：每个会话是一个员工，干活、举手要审批、去茶水间摸鱼。**公开仓库**。
 
 ## 边界（强制）
 
 Claude 在本项目里只做下面「负责」的事；越界的需求先停下来和用户确认，不要顺手改到别的项目里。
 
 - **本项目负责**：
-  - `server/`：工区核心（`office.mjs` 状态机、`translate.mjs` 命令翻译、`memory.mjs`、`report.mjs`、`settings.mjs`）、本机桥接服务（`index.mjs`）、Claude Code hooks 的安装 / 移除（`hooks-config.mjs`）
+  - `server/`：工区核心（`office.mjs` 状态机、`translate.mjs` 命令翻译、`memory.mjs`、`report.mjs`、`settings.mjs`）、本机桥接（`index.mjs`）、两种来源的 hooks 安装 / 移除（`hooks-config.mjs`）和事件边界（`hook-events.mjs`）
   - `web/`：网页版工区（Phaser + Vite），`tools/render_assets.py` 生成全部美术
   - `bin/melon-office.mjs`、`install.sh`：命令行版与一行安装
   - `mac/`：原生 macOS 菜单栏 App（SwiftUI / SpriteKit；`server/` 的核心经 `mac/core/` 打包进 JavaScriptCore 运行）
   - `scripts/`：CI 与（以后的）打包、发布脚本
 - **本项目不负责**：
   - **Claude Code 本身**：只通过公开的 hooks 机制接入，只改 `~/.claude/settings.json`（或项目的 `.claude/settings.local.json`）里带 `X-Melon-Office` 标记 / 指向本机 `/hook/permission` 的那几条，别的配置一律不碰
+  - **Codex 本身**：只通过官方 hooks 接入，只增删 `~/.codex/hooks.json`（支持 `CODEX_HOME`）或项目 `.codex/hooks.json` 中带标记的 hooks。配置与信任分开；不自动信任，不修改 `config.toml`、`auth.json` 或信任记录，不读取会话聊天文件
   - **服务器**：纯本机工具，不部署到服务器，不登记运维注册表。安装包发布到对象存储下载站不算部署
   - **发布流水线本体**（→ `imelonkid/melon-ci`）与**门户登记**（→ 运维仓库 `$OPS_REPO/portal/config.json`）：本仓库只放调用它的表单；要改流水线或门户先和用户确认，在对应仓库改
 - **与其他项目的关系**：依赖 Claude Code 的 hooks 协议、melon-ci 的流水线（`@v2`）；没有项目依赖本仓库
 - **契约**：
   - hooks 协议：被动事件 `POST http://127.0.0.1:<端口>/hook`（command hook，`async`，带 `X-Melon-Office: 1`），审批 `PermissionRequest` → `http://127.0.0.1:<端口>/hook/permission`（http hook）；默认端口 7777。命令行版与 Mac 版共用同一套，改了要两边一起改、一起测
+  - Codex 使用 `/hook/codex` 和 `/hook/codex/permission`（command hook，stdin JSON / stdout JSON）。`SessionEnd` 同步、最多 3 秒；审批无决定时返回 `{}`，保留原应用审批。来源由路由确定，会话及子 Agent 按来源隔离，不给姓名追加来源
   - `~/.config/melon-office/settings.json`、`memory.json`：命令行版与 Mac 版共用，只增字段不改字段
 
 ## 运行
