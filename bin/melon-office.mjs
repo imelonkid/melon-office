@@ -20,6 +20,10 @@ const opt = (name, fallback) => {
 };
 const port = Number(opt('port', process.env.MELON_OFFICE_PORT || 7777));
 const staff = Number(opt('staff', process.env.MELON_OFFICE_STAFF ?? 3));
+const provider = opt('provider', flag('provider') ? '' : 'claude');
+const codexHome = process.env.CODEX_HOME;
+const hookOptions = { port, project: flag('project'), provider, codexHome };
+const providerName = provider === 'codex' ? 'Codex' : 'Claude Code';
 
 function openBrowser(url) {
   const opener = process.platform === 'darwin' ? 'open' : process.platform === 'win32' ? 'cmd' : 'xdg-open';
@@ -41,29 +45,34 @@ function ensureBuilt() {
 }
 
 async function run() {
+  if (!['claude', 'codex'].includes(provider)) throw new Error('--provider 只支持 claude 或 codex');
   switch (cmd) {
     case 'init': {
-      const r = install({ port, project: flag('project'), approvals: !flag('no-approvals') });
+      const r = install({ ...hookOptions, approvals: !flag('no-approvals') });
       console.log(`\n  已写入 hooks → ${r.file}`);
       if (r.backup) console.log(`  原配置已备份 → ${r.backup}`);
-      console.log('  之后新开的 Claude Code 会话会自动走进工区。\n');
+      if (provider === 'codex') console.log('  请在 Codex 的 /hooks 或「设置 → Hooks」中审核并信任这些 hooks，再新开会话。');
+      console.log(`  之后新开的 ${providerName} 会话会走进工区。\n`);
       break;
     }
     case 'uninstall': {
-      const r = uninstall({ project: flag('project') });
-      console.log(r.changed ? `\n  已移除 Melon Office hooks → ${r.file}` : '\n  没有找到需要移除的配置');
-      console.log(`  如果还想删掉程序本身：rm -rf "${ROOT}"，以及 PATH 里的 melon-office 命令\n`);
+      const r = uninstall(hookOptions);
+      console.log(r.changed ? `\n  已移除 ${providerName} 的 Melon Office hooks → ${r.file}` : '\n  没有找到需要移除的配置');
+      console.log('  其他来源和原有配置保持不变。\n');
       break;
     }
     case 'status': {
-      const r = status({ project: flag('project') });
-      const c = check({ port, project: flag('project') });
-      console.log(`\n  配置文件：${r.file}`);
+      const c = check(hookOptions);
+      console.log(`\n  ${providerName} 配置文件：${c.file}`);
       if (c.state === 'unreadable') console.log('  配置文件不是合法的 JSON，先修好它再接入\n');
-      else if (r.events.length) {
-        console.log(`  已接入事件：${r.events.join(', ')}`);
-        console.log(c.state === 'stale' ? '  配置是旧版本或端口不同，运行 `melon-office init` 更新\n' : '');
-      } else console.log('  还没有接入，先运行 `melon-office init`\n');
+      else {
+        const r = status(hookOptions);
+        if (r.events.length) {
+          console.log(`  已接入事件：${r.events.join(', ')}`);
+          console.log(c.state === 'stale' ? `  配置是旧版本或端口不同，运行 melon-office init --provider ${provider} 更新\n` : '');
+          if (provider === 'codex') console.log('  配置已写入；是否信任请在 Codex 的 /hooks 或「设置 → Hooks」中检查。\n');
+        } else console.log(`  还没有接入，先运行 melon-office init --provider ${provider}\n`);
+      }
       break;
     }
     case 'update': {
@@ -82,11 +91,20 @@ async function run() {
       const { url } = await startServer({ port, staff, demo: cmd === 'demo' });
       console.log(`\n  🍈 Melon Office 已开工 → ${url}`);
       // hooks left by an older version (or another port) are brought up to date; never installed stays that way
-      let repaired = false;
-      try { repaired = cmd === 'start' && repair({ port }).repaired; } catch { /* the office runs anyway */ }
-      if (repaired) console.log('  已更新 Claude Code 接入配置（~/.claude/settings.json）');
-      if (cmd === 'start' && status().events.length === 0 && status({ project: true }).events.length === 0) {
-        console.log('  提示：还没接入 Claude Code，另开一个终端运行 `melon-office init`');
+      if (cmd === 'start') {
+        for (const source of ['claude', 'codex']) {
+          try {
+            const result = repair({ port, provider: source, codexHome });
+            if (result.repaired) console.log(source === 'codex' ? '  已更新 Codex 接入配置，请重新审核并信任 hooks' : '  已更新 Claude Code 接入配置');
+            if (result.state === 'unreadable') console.log(`  ${source} 接入配置无法读取，请修复 ${result.file}`);
+          } catch (error) {
+            // A failed hook repair must not stop the already-running office or the other provider.
+            console.error(`  ${source} 接入未能更新：${error.message}`);
+          }
+        }
+        if (['claude', 'codex'].every((source) => [false, true].every((project) => check({ port, provider: source, project, codexHome }).state === 'none'))) {
+          console.log('  提示：另开终端运行 melon-office init --provider claude 或 melon-office init --provider codex');
+        }
       }
       console.log('  按 Ctrl+C 下班\n');
       if (!flag('no-open')) openBrowser(url);
@@ -100,12 +118,13 @@ async function run() {
 
     (无)        开工，等同 start
     demo        演示模式，回放一天的大厂日常
-    init        接入 Claude Code（--project 只接当前项目，--no-approvals 审批仍走终端）
+    init        接入所选来源（--provider claude|codex，默认 claude）
     status      查看接入状态
     update      更新到最新版
     uninstall   移除 hooks
 
-  选项：--port 7777  --no-open  --staff 3（没活时也在工区摸鱼的员工数，0–5）
+  选项：--port 7777  --no-open  --staff 3（常驻人数，0–5）
+  接入：--project 只接当前项目；--no-approvals 审批交回原应用
 `);
   }
 }

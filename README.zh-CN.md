@@ -4,7 +4,7 @@
 
 **我的 AI 员工入职大厂了。**
 
-每个 Claude Code 会话都是一位员工：坐在双屏工位上敲代码，要权限时举手找你审批，
+每个 Claude Code 或 Codex 会话都是一位员工：坐在双屏工位上敲代码，要权限时举手找你审批，
 活一干完就溜去茶水间带薪喝咖啡。瓜老板就是你。
 
 [English](./README.md) · 简体中文
@@ -82,6 +82,22 @@ npm run setup         # 装依赖 + 构建 + 接入 hooks + 开工
 
 ## 命令
 
+### 接入 Codex
+
+Mac 版在「设置 → 接入」开启 Codex。命令行版安装后运行：
+
+```bash
+melon-office init --provider codex
+melon-office status --provider codex
+melon-office uninstall --provider codex  # 只关闭 Codex，不影响 Claude Code
+```
+
+随后在 Codex 的「设置 → Hooks」或命令行 `/hooks` 中**审核并信任**新 hooks，再新开会话。勾选表示已配置，不代表已经信任。支持官方 hooks 的本机 Codex CLI 和桌面端；不采集云端执行的会话，不读取聊天记录、登录凭据或模型配置。详见 [Codex 官方 hooks 文档](https://learn.chatgpt.com/docs/hooks)。
+
+两个来源可独立开启、同时进入一间工区；同项目、同会话 ID 也分配不同员工，来源只在工卡显示，不加在姓名后。Codex 默认关闭，保留现有 Claude Code 选择。Codex 的 `apply_patch` 显示为编辑，中断显示为暂停；暂停不会计入交付。审批超时、关闭工区审批或工区不在线时，交回 Codex 自身的审批流程。
+
+Codex 配置位于 `~/.codex/hooks.json`，也支持 `CODEX_HOME`；`--project` 仅配置当前项目的 `.codex/hooks.json`，`--no-approvals` 保留原应用审批。只增删 Melon Office 的 hooks，已有文件先备份，不自动修改 Codex 的 hooks 信任记录。更新 hooks 后需要重新审核。
+
 | 命令 | 作用 |
 |---|---|
 | `melon-office` | 开工（等同 `start`） |
@@ -111,7 +127,7 @@ Claude Code 会话 ──hooks──▶ 本地桥接服务 127.0.0.1:7777 ──
 - **通知审批**：权限请求会弹出带「同意 / 驳回」按钮的系统通知，不开窗口也能在工区审批。
 - **桌面小窗**：透明、置顶的迷你工区，放在屏幕一角像桌宠；空白处的点击会穿透到下面的窗口。
 - **精简菜单与设置**：菜单栏保留打开工区、桌面小窗、设置、检查更新和退出。小窗大小、常驻员工和录屏模式放在「设置 → 工区」，开机启动、工区名称和日报目录放在「通用」，接入和审批放在「接入」。
-- **按需接入 Claude Code**：第一次打开会问一次要不要写入 hooks。之后每次启动都会检查：旧版本留下的（或端口不同的）hooks 会原地更新，是否在工区审批照旧；选了「以后再说」或主动关闭过，就不再弹窗，可在「设置 → 接入」重新开启。保留已有接入选择，不默认接入新来源；Codex 目前仅显示「暂未支持」，尚不采集会话。
+- **按需接入 Claude Code 与 Codex**：第一次打开会问一次是否接入 Claude Code；之后保留已有选择，旧 hooks 原地更新。Codex 在「设置 → 接入」独立开启，默认关闭；开启后在 Codex 内审核并信任 hooks。两种来源同时运行、独立分配员工，共用工区审批和录屏规则。
 - **原生渲染**：工区用 SpriteKit 画，OA 工作台用 SwiftUI，美术和网页版是同一套。
 - **同一个大脑**：`server/office.mjs`、`translate.mjs`、`hooks-config.mjs` 跑在 JavaScriptCore 里，App 在 7777 端口提供同样的 hook 接口，hooks 和浏览器版都不用改。命令行版和 App 不要同时开。
 

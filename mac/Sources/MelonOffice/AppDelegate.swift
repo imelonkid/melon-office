@@ -41,6 +41,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         store.setResidentStaff = { [weak self] in self?.setStaff($0) }
         store.setWidgetWidth = { [weak self] in self?.setWidgetWidth($0) }
         store.setClaudeConnected = { [weak self] in self?.setClaudeConnected($0) }
+        store.setCodexConnected = { [weak self] in self?.setCodexConnected($0) }
         store.setLaunchAtLogin = { [weak self] in self?.setLaunchAtLogin($0) }
         store.setRecord = { [weak self] on in
             guard let self else { return }
@@ -72,6 +73,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 self.openOffice()
                 if self.defaults.bool(forKey: "widget") { self.toggleWidget() }
                 self.reconcileHooks()
+                if self.core.hooksRepair(port: self.port, provider: "codex") {
+                    self.notifier.info("Codex 接入配置已更新", "请在 Codex 的 Hooks 设置中重新审核并信任配置。")
+                }
             }
             self.refreshDesktopSettings()
         }
@@ -226,6 +230,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         alert("已接入 Claude Code", info + "\n\n之后新开的 Claude Code 会话会自动走进工区。")
     }
 
+    private func setCodexConnected(_ connected: Bool) {
+        if connected {
+            // The office approvals switch controls holding; keep the trusted transport unchanged.
+            let result = core.hooksInstall(port: port, approvals: true, provider: "codex")
+            guard let file = result["file"] as? String else {
+                alert("Codex 接入配置未完成", "请检查 Codex hooks 配置后重试。")
+                refreshDesktopSettings()
+                return
+            }
+            alert("Codex 接入已配置", "写入：\(file)\n\n请在 Codex 的「设置 → Hooks」或命令行 /hooks 中审核并信任接入配置，再新开会话。已有配置会先备份。")
+        } else {
+            let _ = core.hooksUninstall(provider: "codex")
+            alert("Codex 接入已关闭", "只移除 Melon Office 的 hooks，其他配置和 Claude Code 接入保持原样。已打开的 Codex 会话请重新启动。")
+        }
+        refreshDesktopSettings()
+    }
+
     /// "accepted" | "declined" | nil (never asked). Older versions only remembered that they had asked.
     private var hooksChoice: String? {
         get { defaults.string(forKey: "hooksChoice") ?? (defaults.bool(forKey: "askedHooks") ? "declined" : nil) }
@@ -282,7 +303,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private func refreshDesktopSettings() {
         store.desktop = DesktopPreferences(staff: staff, widgetWidth: widgetWidth,
             launchAtLogin: SMAppService.mainApp.status == .enabled,
-            claudeState: core.hooksState(port: port), problem: problem, version: updater.currentVersion)
+            claudeState: core.hooksState(port: port), codexState: core.hooksState(port: port, provider: "codex"),
+            problem: problem, version: updater.currentVersion)
     }
 
     @objc private func quit() {

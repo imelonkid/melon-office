@@ -14,6 +14,7 @@ export interface Agent {
   profile?: EmployeeProfile;
   id: string;
   sessionId: string | null;
+  provider: 'claude' | 'codex' | null;
   isSub: boolean;
   resident: boolean; // in the office even without a session
   parentName: string | null;

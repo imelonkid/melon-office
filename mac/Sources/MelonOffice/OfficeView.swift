@@ -65,7 +65,7 @@ struct OfficeView: View {
                     .frame(width: 28, height: 28).foregroundColor(.accent)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(s.settings.officeName).font(.system(size: 18, weight: .black)).foregroundColor(.text).lineLimit(1)
-                    Text("B3 工区 · Claude Code 实时").font(.system(size: 12)).foregroundColor(.muted)
+                    Text("B3 工区 · AI Agent 实时").font(.system(size: 12)).foregroundColor(.muted)
                 }
             }
             Spacer()

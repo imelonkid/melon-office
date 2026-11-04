@@ -215,6 +215,12 @@ export function humanize(tool = '', input = {}) {
   let r;
   let raw = '';
   switch (tool) {
+    case 'apply_patch': {
+      const patch = typeof input === 'string' ? input : input.command || '';
+      const match = patch.match(/\*\*\* (Update|Add|Delete) File: ([^\n]+)/);
+      r = match ? fileSay(match[1] === 'Add' ? '写' : match[1] === 'Delete' ? '删除' : '改', match[2]) : say('修改代码');
+      break;
+    }
     case 'Edit': case 'MultiEdit': case 'NotebookEdit': r = fileSay('改', file); raw = path.basename(file || ''); break;
     case 'Write': r = fileSay('写', file); raw = path.basename(file || ''); break;
     case 'Read': r = fileSay('看', file); raw = path.basename(file || ''); break;

@@ -98,15 +98,14 @@ struct SettingsView: View {
                 Toggle("Claude Code", isOn: Binding(get: { store.desktop.claudeConnected }, set: store.setClaudeConnected))
                     .disabled(store.desktop.claudeState == "unreadable")
                 Text(claudeDescription).font(.caption).foregroundColor(.secondary)
-                HStack {
-                    Text("Codex")
-                    Spacer()
-                    Text("暂未支持").foregroundColor(.secondary)
-                }
+                Toggle("Codex", isOn: Binding(get: { store.desktop.codexConnected }, set: store.setCodexConnected))
+                    .disabled(store.desktop.codexState == "unreadable")
+                Text(codexDescription).font(.caption).foregroundColor(.secondary)
+                Text("两个来源可同时开启，新来源默认关闭。变更后请新开会话。").font(.caption).foregroundColor(.secondary)
             }
             Section("审批") {
                 Toggle("在工区审批", isOn: Binding(get: { store.state.approvalsEnabled }, set: store.setApprovals))
-                Text("接收 Claude Code 的权限请求；关闭后由终端处理").font(.caption).foregroundColor(.secondary)
+                Text("接收已接入来源的权限请求；关闭后交回原应用处理").font(.caption).foregroundColor(.secondary)
             }
         }
         .formStyle(.grouped)
@@ -118,6 +117,14 @@ struct SettingsView: View {
         case "stale": return "已接入，配置将在下次启动时自动更新。"
         case "unreadable": return "无法读取 Claude Code 配置，请修复配置后重新打开设置。"
         default: return "开启后，新会话会自动进入工区，并备份原有 Claude Code 配置。"
+        }
+    }
+
+    private var codexDescription: String {
+        switch store.desktop.codexState {
+        case "current", "stale": return "配置已写入。请在 Codex 的 Hooks 设置中审核并信任后，新开会话生效；命令行可用 /hooks 审核。"
+        case "unreadable": return "无法读取 Codex hooks 配置，请修复配置后重新打开设置。"
+        default: return "接入本机 Codex 会话。开启后需在 Codex 内审核并信任 hooks，不会修改模型、登录或其他来源。"
         }
     }
 
