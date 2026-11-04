@@ -16,7 +16,8 @@ private let GLOW: [String: UInt32] = [
 
 // name -> frames, frames per second
 private let ANIMS: [String: ([String], Double)] = [
-    "type": (["sit", "sit_type"], 5),
+    "type": (["work1", "work2"], 5),
+    "workThink": (["work1", "work1", "work1", "work2"], 2),
     "raise": (["sit_raise", "sit_raise2"], 3),
     "think": (["sit", "sit", "sit", "sit", "sit", "sit_blink"], 4),
     "walk": (["walk1", "walk2"], 7),
@@ -217,6 +218,7 @@ private final class Worker {
         let a = agent
         if place == .seat {
             guard let s = seat else { return }
+            sprite.flipped = false // working frames face the monitor, regardless of walk-in direction
             sprite.position = scene.sk(CGPoint(x: s.anchor[0], y: s.anchor[1]))
             sprite.zPosition = s.y * scene.layout.iso.s
             if a.status == "slacking" && a.activity != "fake" {
@@ -231,7 +233,7 @@ private final class Worker {
             glow.isHidden = false
             if a.status == "waiting" { sprite.play("raise") }
             else if (a.status == "working" && a.kind != "fail") || a.activity == "fake" { sprite.play("type") }
-            else { sprite.play("think") }
+            else { sprite.play(a.isWorking ? "workThink" : "think") }
         } else {
             glow.isHidden = true
             sprite.position = scene.sk(scene.project(pos.x, pos.y))
@@ -263,11 +265,11 @@ private final class Worker {
         let page = scene.page(sprite.position)
         let lift: CGFloat = place == .seat ? 105 : 125
         bubble.px = page.x
-        bubble.py = page.y - lift - 4 * CGFloat(sin(time / 450 + phase))
-        let variant: Bubble.Variant = a.status == "waiting" ? .ask : (a.status == "working" && a.kind == "bash") ? .term : .say
+        bubble.py = page.y - lift - (a.isWorking ? 0 : 4 * CGFloat(sin(time / 450 + phase)))
+        let variant: Bubble.Variant = a.status == "waiting" ? .ask : a.isWorking ? .work : .say
         let store = scene.store
-        bubble.show(name: a.name, cast: a.cast, text: store.line(a), variant: variant, pending: pending,
-                    ask: pending.map(store.ask) ?? "", raw: store.raw(a.raw))
+        bubble.show(name: a.name, cast: a.cast, text: a.isWorking ? "工作中" : store.line(a), variant: variant, pending: pending,
+                    ask: pending.map(store.ask) ?? "", raw: a.isWorking ? "" : store.raw(a.raw))
     }
 }
 

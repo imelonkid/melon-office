@@ -13,6 +13,7 @@ final class Assets {
     let size: CGSize
     let images: [String: SKTexture]
     private var sheets: [String: [SKTexture]] = [:]
+    private var workSheets: [String: [SKTexture]] = [:]
     private var avatars: [String: NSImage] = [:]
     /// alpha of the background, to tell the office floor from the empty corners (widget click-through)
     private let floorPath: CGPath
@@ -23,9 +24,17 @@ final class Assets {
         size = CGSize(width: layout.size[0], height: layout.size[1])
         self.images = ["illustration": SKTexture(image: NSImage(contentsOf: dir.appendingPathComponent("illustration/office.png"))!)]
         let countColumns = layout.atlas.columns
+        let work = SKTexture(image: NSImage(contentsOf: dir.appendingPathComponent("illustration/working.png"))!)
+        let workAtlas = layout.workAtlas
         let columns = CGFloat(countColumns), rows = CGFloat(layout.atlas.rows)
         for key in Self.castKeys {
             let source = layout.characters[key]!
+            let column = workAtlas.characters.firstIndex(of: source)!
+            workSheets[key] = (0..<workAtlas.rows).map { row in
+                SKTexture(rect: CGRect(x: CGFloat(column) / CGFloat(workAtlas.columns),
+                                      y: 1 - CGFloat(row + 1) / CGFloat(workAtlas.rows),
+                                      width: 1 / CGFloat(workAtlas.columns), height: 1 / CGFloat(workAtlas.rows)), in: work)
+            }
             let img = NSImage(contentsOf: dir.appendingPathComponent("illustration/\(source).png"))!
             let sheet = SKTexture(image: img)
             sheets[key] = layout.frames.indices.map { i in
@@ -48,6 +57,7 @@ final class Assets {
     }
 
     func frame(_ cast: String, _ name: String) -> SKTexture {
+        if name == "work1" || name == "work2" { return workSheets[cast]![name == "work1" ? 0 : 1] }
         let i = max(0, layout.frames.firstIndex(of: name) ?? 0)
         let list = sheets[cast] ?? sheets["pi"]!
         return list[min(i, list.count - 1)]

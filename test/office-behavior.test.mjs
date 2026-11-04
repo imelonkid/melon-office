@@ -63,4 +63,8 @@ test('all runtime artwork is present and the live plate dimensions match the lay
     assert.ok(data.readUInt32BE(16) >= 6 * 100);
     assert.ok(data.readUInt32BE(20) >= 3 * 100);
   }
+  const working = readFileSync(new URL('../web/public/assets/illustration/working.png', import.meta.url));
+  assert.equal(working.readUInt32BE(16) % layout.workAtlas.columns, 0);
+  assert.equal(working.readUInt32BE(20) % layout.workAtlas.rows, 0);
+  for (const source of Object.values(layout.characters)) assert.ok(layout.workAtlas.characters.includes(source));
 });

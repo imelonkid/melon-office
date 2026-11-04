@@ -15,12 +15,13 @@ function avatar(a: Agent) {
 
 function card(a: Agent, now: number, right: string, sub: string, cls = '') {
   const proj = projectOf(a);
-  const raw = rawOf(a.raw);
+  const working = a.status === 'working' || a.status === 'thinking';
+  const raw = working ? '' : rawOf(a.raw);
   return `<div class="card employee-link ${cls}" data-employee="${esc(a.id)}" role="button" tabindex="0" aria-label="查看${esc(a.name)}的员工档案">
     ${avatar(a)}
     <div class="card-body">
       <div class="card-top"><b>${esc(a.name)}</b><span class="muted">${esc(right || since(a.startedAt, now))}</span></div>
-      <div class="card-line">${sub}</div>
+      <div class="card-line">${working ? '工作中<span class="work-dots" aria-label="进行中"><i></i><i></i><i></i></span>' : sub}</div>
       ${raw ? `<div class="card-sub ${KIND_CLASS[a.kind] || ''}">${esc(raw)}</div>` : ''}
       ${proj ? `<div class="card-proj">${esc(a.role)} · ${esc(proj)}</div>` : ''}
     </div>
@@ -50,7 +51,7 @@ function profile(a: Agent | undefined, s: State) {
     </article>
     ${pending.map((item) => `<div class="card ask"><div class="card-body"><b>待你审批</b><div class="profile-ask">${esc(askOf(item))}</div>${item.holding ? `<div class="btns"><button class="ok" data-decide="allow" data-id="${esc(item.id)}">同意</button><button class="no" data-decide="deny" data-id="${esc(item.id)}">驳回</button></div>` : '<div class="muted">请在终端里确认</div>'}</div></div>`).join('')}
     <h3 class="profile-recent-title">最近动态</h3>
-    ${RECORD ? '<div class="empty">录屏模式：已隐藏项目、命令和历史动态</div>' : recent.length ? `<ol class="profile-timeline">${recent.map((item) => `<li><time>${esc(since(item.t, s.now))}</time><span>${esc(item.text)}</span></li>`).join('')}</ol>` : '<div class="empty">还没有工作动态，等待新任务。</div>'}`;
+    ${RECORD ? '<div class="empty">录屏模式：已隐藏项目、命令和历史动态</div>' : recent.length ? `<ol class="profile-timeline">${recent.map((item) => `<li><time>${esc(since(item.t, s.now))}</time><span>${esc(item.text)}${item.raw ? `<code>${esc(item.raw)}</code>` : ''}</span></li>`).join('')}</ol>` : '<div class="empty">还没有工作动态，等待新任务。</div>'}`;
 }
 
 export function mountPanel(el: HTMLElement) {

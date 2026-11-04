@@ -2,6 +2,22 @@ import AppKit
 import SpriteKit
 import SwiftUI
 
+private struct WorkingLabel: View {
+    var body: some View {
+        HStack(spacing: 6) {
+            Text("工作中").font(.system(size: 12)).foregroundColor(.text)
+            TimelineView(.animation(minimumInterval: 0.1)) { timeline in
+                HStack(spacing: 3) {
+                    ForEach(0..<3) { i in
+                        Circle().fill(Color.accent).frame(width: 3, height: 3)
+                            .offset(y: -3 * max(0, sin(timeline.date.timeIntervalSinceReferenceDate * 6 - Double(i) * 0.8)))
+                    }
+                }
+            }.frame(width: 15, height: 12)
+        }
+    }
+}
+
 // The main window: header chips, the office scene with its caption, and the OA 工作台 on the right.
 // Same content as web/index.html + web/src/panel.ts, in SwiftUI.
 
@@ -166,7 +182,7 @@ private struct PanelView: View {
     }
 
     private func card(_ a: Agent, right: String, dim: Bool = false) -> some View {
-        let raw = store.raw(a.raw)
+        let raw = a.isWorking ? "" : store.raw(a.raw)
         let proj = store.project(a)
         let kindColor: [String: Color] = ["edit": .accent, "read": Color(0x7EC8F2), "search": Color(0x7EC8F2), "bash": Color(0xF2A65A), "web": Color(0xC78BE8), "fail": Color(0xFF8A80)]
         return Button { store.selectEmployee(a.id) } label: {
@@ -178,7 +194,11 @@ private struct PanelView: View {
                         Spacer()
                         Text(right).font(.system(size: 11)).foregroundColor(.muted).lineLimit(1)
                     }
-                    Text(store.line(a)).font(.system(size: 12)).foregroundColor(.text).lineLimit(1)
+                    if a.isWorking {
+                        WorkingLabel()
+                    } else {
+                        Text(store.line(a)).font(.system(size: 12)).foregroundColor(.text).lineLimit(1)
+                    }
                     if !raw.isEmpty {
                         Text(raw).font(.system(size: 11, design: .monospaced)).foregroundColor(kindColor[a.kind] ?? Color(0xC9BFE0)).lineLimit(1)
                     }

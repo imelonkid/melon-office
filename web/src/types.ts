@@ -64,6 +64,7 @@ export interface FeedItem {
   agentId: string;
   name: string;
   text: string;
+  raw?: string;
 }
 
 export interface State {
@@ -94,6 +95,7 @@ export type XY = [number, number];
 
 export interface Layout {
   atlas: { columns: number; rows: number };
+  workAtlas: { columns: number; rows: number; characters: string[] };
   characters: Record<string, string>;
   boundary: XY[];
   foregrounds: { depth: number; points: XY[] }[];

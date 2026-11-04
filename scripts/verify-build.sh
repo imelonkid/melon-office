@@ -12,6 +12,7 @@ need Resources/core.js              # 工区核心（JavaScriptCore）
 need Resources/AppIcon.icns
 need Resources/assets               # 原生工区的美术
 need Resources/assets/illustration/office.png # 插画主场景
+need Resources/assets/illustration/working.png # 朝向电脑的工作动画
 for who in gua tian zi agua pi boss; do need "Resources/assets/illustration/$who.png"; done
 need Resources/dist/index.html      # 「在浏览器中打开」的网页版
 arch="$(lipo -archs "$APP/Contents/MacOS/MelonOffice" 2>/dev/null || true)"

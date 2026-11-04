@@ -98,8 +98,8 @@ export class Office extends EventEmitter {
   // ---------- helpers ----------
   changed() { this.emit('change'); }
 
-  log(agent, text) {
-    this.feed.unshift({ t: Date.now(), agentId: agent.id, name: agent.name, text });
+  log(agent, text, raw = '') {
+    this.feed.unshift({ t: Date.now(), agentId: agent.id, name: agent.name, text, raw });
     this.feed.length = Math.min(this.feed.length, 30);
   }
 
@@ -336,7 +336,7 @@ export class Office extends EventEmitter {
         a.toolCalls++;
         this.stats.toolCalls++;
         this.set(a, { status: 'working', kind: classify(evt.tool_name), tool: evt.tool_name, detail: h.raw, line: h.text, gist: h.gist, raw: h.raw });
-        this.log(a, h.text);
+        this.log(a, h.text, h.raw);
         break;
       }
       case 'PostToolUse':

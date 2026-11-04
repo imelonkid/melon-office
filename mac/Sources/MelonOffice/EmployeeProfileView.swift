@@ -30,8 +30,13 @@ struct EmployeeProfileView: View {
                                     Circle().fill(Color.accent).frame(width: 6, height: 6).padding(.top, 5)
                                     Text(Copy.since(event.time, now: store.state.now))
                                         .font(.system(size: 11)).foregroundColor(.muted).frame(width: 34, alignment: .leading)
-                                    Text(event.text).font(.system(size: 12)).foregroundColor(.text)
-                                        .fixedSize(horizontal: false, vertical: true)
+                                    VStack(alignment: .leading, spacing: 5) {
+                                        Text(event.text).font(.system(size: 12)).foregroundColor(.text)
+                                        if !event.raw.isEmpty {
+                                            Text(event.raw).font(.system(size: 10, design: .monospaced)).foregroundColor(.muted)
+                                                .textSelection(.enabled)
+                                        }
+                                    }.fixedSize(horizontal: false, vertical: true)
                                 }
                             }
                         }
