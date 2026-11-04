@@ -101,7 +101,7 @@ Claude Code sessions ──hooks──▶ local bridge 127.0.0.1:7777 ──WebS
 
 A native macOS version lives in [`mac/`](mac): a menu bar app that runs the office without Node or a browser.
 
-- **Menu bar**: 🍈 shows how many employees are working and how many approvals are waiting; approve or deny right from the menu.
+- **Matching icons**: a flat workstation and employee badge on white in the Dock, with a monochrome monitor in the menu bar that adapts to light and dark backgrounds. A dash means idle, two eyes mean working, and an exclamation mark means approvals need attention or the server has a problem. Working and approval counts remain beside it; approve or deny right from the menu.
 - **Approval notifications**: requests show up as macOS notifications with 同意 / 驳回 buttons, so the office can hold them even with no window open.
 - **Desk widget**: an always-on-top, transparent mini office for a corner of your screen. Clicks pass through the empty corners.
 - **Connects itself to Claude Code**: on first launch it asks once whether to add its hooks. After that, every launch checks them: hooks left by an older version (or a different port) are updated in place, keeping your choice about approvals. If you said no, or removed them from the menu, it won't ask again; 接入 Claude Code in the menu brings them back.
