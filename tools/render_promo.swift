@@ -228,8 +228,8 @@ func render(_ time:Double) {
         text("03:00  /  STILL SHIPPING",1510,75,13,yellow)
         line(96,118,1728)
         text(english ? "THE AI DEPARTMENT IS NOW OPEN":"AI 事业部 · 今日正式开工",96,188,14,mint,true)
-        text(english ? "I hired AI.":"我的 AI 员工，",92,252,english ? 90:76,cream,true,710)
-        text(english ? "They took breaks.":"入职大厂了。",92,370,english ? 72:76,mint,true,710)
+        text(english ? "You hired AI.":"我的 AI 员工，",92,252,english ? 90:76,cream,true,710)
+        text(english ? "Now take a break.":"入职大厂了。",92,370,english ? 72:76,mint,true,710)
         text(english ? "They code. They ask for approval.\nThen they sneak off for coffee.":"代码照写，班照加。\n有事举手，没事摸鱼。",98,496,25,muted,false,620)
         fill(96,646,565,142,NSColor(srgbRed:0.07,green:0.12,blue:0.085,alpha:1),12)
         let staticTitle=english ? "A DESK. A BADGE. A LITTLE PERSONALITY.":"AI 员工入职指南"

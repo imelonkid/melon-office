@@ -8,9 +8,10 @@ mkdir -p promo-output
 mkdir -p site/assets
 promo_tmp="$(mktemp -d)"
 trap 'rm -rf "$promo_tmp"' EXIT
-swiftc -O tools/render_promo.swift -o "$promo_tmp/render"
+swiftc -O -module-cache-path "$promo_tmp/module-cache" tools/render_promo.swift -o "$promo_tmp/render"
 "$promo_tmp/render" office png site/assets/office-hero-v1.png
 "$promo_tmp/render" avatar png site/assets/tian-portrait-v1.png
+"$promo_tmp/render" office raw - 20 | ffmpeg -hide_banner -loglevel error -y -f rawvideo -pixel_format rgba -video_size 1448x1086 -framerate 20 -i pipe:0 -an -c:v libx264 -preset fast -crf 20 -pix_fmt yuv420p -movflags +faststart site/assets/office-loop-v1.mp4
 "$promo_tmp/render" landscape-zh png promo-output/hero-1920x1080.png
 "$promo_tmp/render" portrait png promo-output/xiaohongshu-cover-1080x1920.png
 "$promo_tmp/render" landscape-en png promo-output/x-cover-1920x1080.png

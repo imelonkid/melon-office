@@ -723,7 +723,7 @@ html[lang=en] .story-tab strong {
   padding-bottom:42px;
 }
 
-.office-still {
+.office-scene {
   display:block;
   width:112%;
   height:auto;
@@ -1022,7 +1022,7 @@ html[lang=en] .badge-person h2 {
 }
 
 @media(max-width:760px) {
-  .office-still {
+  .office-scene {
     width:113%;
     margin-left:-9%;
     margin-top:8px;
