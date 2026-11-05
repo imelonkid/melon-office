@@ -48,6 +48,10 @@ And it's a lot of fun to watch.
 
 ## Quick start
 
+### Promotional page and media
+
+The static `site/` Hero introduces the AI office and its employee badges, with Chinese/English copy and fixed sample artwork. It never connects to the bridge or reads sessions. Run `npm run promo:preview` and open `http://127.0.0.1:5175/`, or open `site/index.html` directly. The page is buildless and independent of the app. On macOS with FFmpeg installed, `npm run promo:render` produces posters, covers, 20-second silent landscape/portrait videos and a looping GIF in `promo-output/`. See [the media guide](docs/PROMO.md). Nothing is automatically published.
+
 ### Connect Codex
 
 On Mac, enable Codex in Settings → 接入. With the CLI already installed, run:

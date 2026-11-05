@@ -5,6 +5,7 @@ dist/
 __pycache__/
 mac/.build/
 mac/build/
+promo-output/
 
 # 密钥与数据不进 git（项目基线）
 .env
