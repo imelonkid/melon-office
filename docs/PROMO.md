@@ -4,11 +4,11 @@
 
 ## 静态 Hero
 
-页面位于产品仓库 `site/`，按 melon-ops / project-init 基线 v3 的「静态宣传页」维护：纯 HTML、CSS、图片、预渲染视频与少量脚本，无构建依赖。运行 `npm run promo:preview`，访问 `http://127.0.0.1:5175/`；也可直接打开 `site/index.html`。应用的 Vite 构建不包含宣传页。宣传页播放离线生成的办公室无声循环视频，不启动实时场景引擎、不引入 Phaser、不连接 WebSocket、hooks 或外部模型，也不读取本地任务；脚本处理中文/英文切换，并在系统要求减少动态效果时停止自动播放。视频提供原生播放控制，可手动暂停。下载与 GitHub 按钮指向项目现有公开入口。
+页面位于产品仓库 `site/`，按 melon-ops / project-init 基线 v3 的「静态宣传页」维护：纯 HTML、CSS、图片、预渲染视频与少量脚本，无构建依赖。运行 `npm run promo:preview`，访问 `http://127.0.0.1:5175/`；也可直接打开 `site/index.html`。应用的 Vite 构建不包含宣传页。宣传页播放离线生成的办公室无声循环视频，不启动实时场景引擎、不引入 Phaser、不连接 WebSocket、hooks 或外部模型，也不读取本地任务；脚本处理中文/英文切换，并在系统要求减少动态效果时停止自动播放。视频提供原生播放控制，可手动暂停。下载按钮沿用 Drip 的方案：加载公开 OSS `latest.json`，取 `files.arm64`（本项目为同时支持 Apple 芯片和 Intel 的 universal DMG）。校验 HTTPS 来源、项目目录、`.dmg` 后缀和无嵌入凭据，再用 HEAD 确认可访问后替换下载链接；清单和 HEAD 共用五秒超时，失败、缺字段或非法地址时保留 HTML 中的 GitHub Release 链接。禁用脚本或清单尚未加载完成时也保留 GitHub。普通 GitHub 源码按钮不变。
 
 桌面布局为主题文案、等距工区及前景工卡。手机布局将工卡下移，保留工区与行政猫；页面只保留 Hero 和页脚，移除四场景说明与底部重复介绍。工卡复用实际档案中的夹扣、角色头像、岗位、来源、工作状态和任务摘要样式。页面中的姓名、项目、在岗时长属于固定示例档案。
 
-循环视频：`site/assets/office-loop-v1.mp4`（1448×1086，20 秒、20 fps、H.264 / yuv420p，无声）；静态封面：`site/assets/office-hero-v1.png`；工卡头像：`site/assets/tian-portrait-v1.png`。所有依赖均在 `site/` 内，不依赖社交平台宣传视频、本地桥接或 Node 服务。资源采用版本化文件名；上线后修改图片、样式或脚本须换文件名，避免长缓存影响。
+循环视频：`site/assets/office-loop-v1.mp4`（1448×1086，20 秒、20 fps、H.264 / yuv420p，无声）；静态封面：`site/assets/office-hero-v1.png`；工卡头像：`site/assets/tian-portrait-v1.png`。页面渲染资源均在 `site/` 内，不依赖社交平台宣传视频、本地桥接或 Node 服务；仅下载链接查询公开 OSS 版本清单。资源采用版本化文件名；上线后修改图片、样式或脚本须换文件名，避免长缓存影响。
 
 ## 离线生成
 

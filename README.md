@@ -50,7 +50,7 @@ And it's a lot of fun to watch.
 
 ### Promotional page and media
 
-The static `site/` Hero introduces the AI office and its employee badges, with Chinese/English copy, a silent looping office video and a separate foreground employee badge. Its English headline is “You hired AI. Now take a break.” It never connects to the bridge or reads sessions. Run `npm run promo:preview` and open `http://127.0.0.1:5175/`, or open `site/index.html` directly. The page is buildless and independent of the app. On macOS with FFmpeg installed, `npm run promo:render` produces posters, covers, 20-second silent landscape/portrait videos and a looping GIF in `promo-output/`, plus the office preview video in `site/assets/`. See [the media guide](docs/PROMO.md). Nothing is automatically published.
+The static `site/` Hero introduces the AI office and its employee badges, with Chinese/English copy, a silent looping office video and a separate foreground employee badge. Its English headline is “You hired AI. Now take a break.” It never connects to the bridge or reads sessions. Downloads prefer the latest universal DMG from Alibaba Cloud OSS, with GitHub Release as the fallback if metadata or the installer cannot be validated. Run `npm run promo:preview` and open `http://127.0.0.1:5175/`, or open `site/index.html` directly. The page is buildless and independent of the app. On macOS with FFmpeg installed, `npm run promo:render` produces posters, covers, 20-second silent landscape/portrait videos and a looping GIF in `promo-output/`, plus the office preview video in `site/assets/`. See [the media guide](docs/PROMO.md). Nothing is automatically published.
 
 ### Connect Codex
 
