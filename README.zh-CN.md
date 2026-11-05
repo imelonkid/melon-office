@@ -48,7 +48,7 @@
 
 ### 宣传页与素材
 
-静态 Hero 宣传页突出「AI 员工入职大厂」与员工工卡，提供中英文切换，工卡叠在无声循环的办公室演示视频上，不读取会话或连接工区服务。英文标题为「You hired AI. Now take a break.」，表达 AI 工作、你休息。下载优先使用阿里云 OSS 的最新 universal 安装包，清单或安装包验证失败时回退 GitHub Release。运行 `npm run promo:preview` 后访问 `http://127.0.0.1:5175/`；页面位于独立的 `site/`，不需要构建，也可直接打开 `site/index.html`。macOS 上安装 FFmpeg 后运行 `npm run promo:render`，在 `promo-output/` 生成 Hero 海报、封面、20 秒横竖版无声视频及循环 GIF，并在 `site/assets/` 生成办公室循环视频；详见 [宣传素材说明](docs/PROMO.md)。这些命令不会发布内容。
+静态 Hero 宣传页突出「AI 员工入职大厂」与员工工卡，提供中英文切换，工卡叠在无声循环、隐藏原生播放控制栏的办公室演示视频上，不读取会话或连接工区服务。英文标题为「You hired AI. Now take a break.」，表达 AI 工作、你休息。下载优先使用阿里云 OSS 的最新 universal 安装包，清单或安装包验证失败时回退 GitHub Release。运行 `npm run promo:preview` 后访问 `http://127.0.0.1:5175/`；页面位于独立的 `site/`，不需要构建，也可直接打开 `site/index.html`。macOS 上安装 FFmpeg 后运行 `npm run promo:render`，在 `promo-output/` 生成 Hero 海报、封面、20 秒横竖版无声视频及循环 GIF，并在 `site/assets/` 生成办公室循环视频；详见 [宣传素材说明](docs/PROMO.md)。这些命令不会发布内容。
 
 一行命令装好。需要 Node 18+、git 和 Claude Code（macOS / Linux）。
 
