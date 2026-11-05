@@ -41,9 +41,10 @@ Hero PNG 是独立宣传设计稿，并非网页截图；HTML 的布局应在桌
 
 ## 后续部署
 
-按项目基线「静态宣传页」使用 `scripts/deploy-page.sh`，脚本来自 project-init 模板，仅将服务名设为拟登记的 `melon-office-page`，页面目录为 `site`。它与桌面端发布完全独立：
+按项目基线「静态宣传页」使用 `scripts/deploy-page.sh`，脚本来自 project-init 模板，仅将服务名设为已登记的 `melon-office-page`，页面目录为 `site`。它与桌面端发布完全独立：
 
 - 页面使用 `page-v*`；桌面端继续使用原有版本前缀和门户。
 - 页面只允许从已推送的干净 main 发布，通过环境变量 `PAGE_DEPLOY_SSH` 调用部署入口；不在公开仓库写主机地址、站点目录或部署密钥。
 - 部署入口从 GitHub 对应 tag 取 `site/`，原子切换版本并支持回滚；不使用 rsync、不起容器、不增加 Dockerfile 或 `/health`。
-- 用户确认上线前，由 melon-ops 完成腾讯站服务注册、部署入口与限定钥匙、反代、DNS/证书及 Gatus 首页探活；这些目前尚未登记或部署。本次只完成页面和仓库内发布准备，不运行发布命令、不创建标签。
+- 腾讯站服务注册、部署入口与限定钥匙、反代、DNS/证书及 Gatus 首页探活由 melon-ops 管理；服务登记为 `melon-office-page`，实际发布版本以部署入口 `status` 为准。发布须有用户明确指令，不能随代码提交自动触发。
+- 静态宣传页统一门户发布已记入 melon-ops 路线待办，后续由平台补齐发布、回滚与状态查询，再统一接入 Drip 和本项目。
