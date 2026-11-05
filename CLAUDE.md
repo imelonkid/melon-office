@@ -11,7 +11,7 @@ Claude 在本项目里只做下面「负责」的事；越界的需求先停下�
   - `web/`：网页版工区（Phaser + Vite），`tools/render_assets.py` 生成全部美术
   - `bin/melon-office.mjs`、`install.sh`：命令行版与一行安装
   - `mac/`：原生 macOS 菜单栏 App（SwiftUI / SpriteKit；`server/` 的核心经 `mac/core/` 打包进 JavaScriptCore 运行）
-  - `site/`：独立静态宣传页（HTML / CSS / 图片 / 少量脚本），突出 AI 工区与员工工卡；`scripts/deploy-page.sh` 按项目基线发布页面，`tools/render_promo.swift` 离线生成宣传素材
+  - `site/`：独立静态宣传页（HTML / CSS / 图片 / 预渲染视频 / 少量脚本），突出 AI 工区与员工工卡；`scripts/deploy-page.sh` 按项目基线发布页面，`tools/render_promo.swift` 离线生成宣传素材
   - `scripts/`：CI 与（以后的）打包、发布脚本
 - **本项目不负责**：
   - **Claude Code 本身**：只通过公开的 hooks 机制接入，只改 `~/.claude/settings.json`（或项目的 `.claude/settings.local.json`）里带 `X-Melon-Office` 标记 / 指向本机 `/hook/permission` 的那几条，别的配置一律不碰
