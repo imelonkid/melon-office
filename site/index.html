@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="stylesheet" href="assets/hero-v1.css">
+    <meta name="theme-color" content="#080a09" />
+    <meta name="description" content="我的 AI 员工入职大厂了。把 Claude Code 和 Codex 的真实会话，变成一间会加班、会举手、也会摸鱼的桌面办公室。" />
+    <title>Melon Office — 我的 AI 员工，入职大厂了。</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='3' y='5' width='26' height='19' rx='5' fill='%239be29f'/%3E%3Crect x='6' y='8' width='20' height='13' rx='3' fill='%23080a09'/%3E%3Ccircle cx='12' cy='14' r='2' fill='%239be29f'/%3E%3Ccircle cx='20' cy='14' r='2' fill='%239be29f'/%3E%3Cpath d='M16 24v4m-5 0h10' stroke='%239be29f' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E" />
+  </head>
+  <body>
+    <div class="promo-shell">
+      <header class="promo-nav">
+        <a class="logo" href="#top" aria-label="Melon Office 首页"><span class="logo-icon" aria-hidden="true"><i></i><i></i></span>melon office<span class="logo-note">甜瓜科技出品</span></a>
+        <nav aria-label="主导航">
+          <a href="#story" data-zh="看看他们怎么上班" data-en="A day at the office">看看他们怎么上班</a>
+          <a href="https://github.com/imelonkid/melon-office" target="_blank" rel="noopener noreferrer">GitHub ↗</a>
+          <button class="language" id="language" aria-label="Switch to English">EN</button>
+        </nav>
+      </header>
+      <main id="top">
+        <section class="hero" aria-labelledby="headline">
+          <div class="hero-copy">
+            <div class="eyebrow"><span></span><span data-zh="AI 事业部 · 今日正式开工" data-en="THE AI DEPARTMENT IS NOW OPEN">AI 事业部 · 今日正式开工</span></div>
+            <h1 id="headline"><span data-zh="我的 AI 员工，" data-en="I hired AI.">我的 AI 员工，</span><br><em data-zh="入职大厂了。" data-en="They took breaks.">入职大厂了。</em></h1>
+            <p class="hero-desc" data-zh="代码照写，班照加。\n有事举手，没事摸鱼。" data-en="They code. They ask for approval.\nThen they sneak off for coffee.">代码照写，班照加。<br>有事举手，没事摸鱼。</p>
+            <div class="hero-actions">
+              <a class="cta primary" href="https://github.com/imelonkid/melon-office/releases/latest" target="_blank" rel="noopener noreferrer"><span data-zh="领走你的 AI 员工" data-en="Meet your AI team">领走你的 AI 员工</span><span aria-hidden="true">↗</span></a>
+              <a class="cta secondary" href="https://github.com/imelonkid/melon-office" target="_blank" rel="noopener noreferrer"><span data-zh="去 GitHub 看看" data-en="View on GitHub">去 GitHub 看看</span><span aria-hidden="true">↗</span></a>
+            </div>
+            <div class="compatibility"><span>Claude Code</span><b>×</b><span>Codex</span><i></i><span data-zh="本地运行 · 开源" data-en="Local-first · Open source">本地运行 · 开源</span></div>
+            <div class="little-note"><span class="note-star">✳</span><span data-zh="老板是你。猫也是你的同事。" data-en="You're the boss. The cat is your coworker.">老板是你。猫也是你的同事。</span></div>
+          </div>
+          <div class="hero-visual">
+            <div class="scene-meta"><span><i></i><span data-zh="一间办公室，每位 AI 都有工卡" data-en="A tiny office. A badge for every agent.">一间办公室，每位 AI 都有工卡</span></span><span class="demo-label" data-zh="演示画面 · 非实时任务" data-en="SCRIPTED DEMO · NOT LIVE">演示画面 · 非实时任务</span></div>
+            <div class="office-and-badge">
+              <img class="office-still" src="assets/office-hero-v1.png" width="1448" height="1086" alt="米黄墙面的等距办公室：AI 员工面对电脑工作，猫在左下角休息，老板坐在玻璃办公室内" fetchpriority="high">
+              <article class="hero-badge" aria-label="示例员工工卡：小甜，测试，Codex，工作中">
+                <div class="badge-tab" aria-hidden="true"></div>
+                <div class="badge-topline"><span>MELON OFFICE</span><strong data-zh="员工档案" data-en="EMPLOYEE FILE">员工档案</strong></div>
+                <div class="badge-person"><div class="badge-avatar" role="img" aria-label="橙色头发、戴眼镜的小甜"></div><div><h2 data-zh="小甜" data-en="Tian">小甜</h2><p data-zh="测试 · P5" data-en="QA · P5">测试 · P5</p><span class="badge-source">Codex</span><p data-zh="AI 事业部" data-en="AI Department">AI 事业部</p></div></div>
+                <div class="badge-work"><i></i><span data-zh="在岗 · 工作中" data-en="On duty · Working">在岗 · 工作中</span><span class="badge-dots">···</span></div>
+                <dl><div><dt data-zh="当前项目" data-en="Project">当前项目</dt><dd>melon-office</dd></div><div><dt data-zh="本次在岗" data-en="On duty">本次在岗</dt><dd data-zh="18 分钟" data-en="18 min">18 分钟</dd></div></dl>
+                <div class="badge-task"><b data-zh="⌘ 正在做什么" data-en="⌘ CURRENT TASK">⌘ 正在做什么</b><p data-zh="运行测试，检查状态切换" data-en="Running tests. Checking state transitions.">运行测试，检查状态切换</p></div>
+                <div class="badge-end"><span data-zh="常驻员工 · 甜瓜科技" data-en="Resident · Melon Office">常驻员工 · 甜瓜科技</span><i aria-hidden="true"></i></div>
+              </article>
+              <div class="badge-caption"><span>↗</span><span data-zh="每位 AI，都有自己的工卡。" data-en="Every agent gets an identity.">每位 AI，都有自己的工卡。</span></div>
+            </div>
+            <div class="scene-footer"><span class="scene-episode" data-zh="有工位，有工卡，还有猫。" data-en="A desk. A badge. And a cat.">有工位，有工卡，还有猫。</span><span class="still-label" data-zh="静态展示 · 示例档案" data-en="STATIC PREVIEW · SAMPLE PROFILE">静态展示 · 示例档案</span></div>
+          </div>
+        </section>
+        <section id="story" class="story" aria-labelledby="story-heading">
+          <div class="section-heading"><p class="eyebrow" data-zh="一天，四个名场面" data-en="FOUR MOMENTS. ONE OFFICE.">一天，四个名场面</p><h2 id="story-heading" data-zh="这班，上得很有画面。" data-en="A workday worth watching.">这班，上得很有画面。</h2><p data-zh="真实任务状态，变成看得懂的职场日常。" data-en="Real agent events, turned into tiny office moments.">真实任务状态，变成看得懂的职场日常。</p></div>
+          <div class="story-tabs">
+            <article class="story-tab"><span class="tab-index">01 / EMPLOYEE BADGE</span><strong data-zh="AI 入职，先发工卡。" data-en="New hire. New badge.">AI 入职，先发工卡。</strong><span data-zh="名字、岗位、来源，一眼认清。" data-en="Name, role, source. All on the badge.">名字、岗位、来源，一眼认清。</span></article>
+            <article class="story-tab"><span class="tab-index">02 / NEED THE BOSS</span><strong data-zh="老板，签个字。" data-en="Boss, a little approval?">老板，签个字。</strong><span data-zh="权限请求，举手找你。" data-en="Permission needed? Hand up.">权限请求，举手找你。</span></article>
+            <article class="story-tab"><span class="tab-index">03 / COFFEE BREAK</span><strong data-zh="交付完，带薪撸猫。" data-en="Shipped. Time to pet the cat.">交付完，带薪撸猫。</strong><span data-zh="活干完了，茶水间见。" data-en="Job done. Meet at the pantry.">活干完了，茶水间见。</span></article>
+            <article class="story-tab"><span class="tab-index">04 / ACT NATURAL</span><strong data-zh="老板来了，假装很忙。" data-en="Boss incoming. Look busy.">老板来了，假装很忙。</strong><span data-zh="熟悉的黑话，熟悉的默契。" data-en="Some office rituals are universal.">熟悉的黑话，熟悉的默契。</span></article>
+          </div>
+        </section>
+        <section class="closing"><span class="closing-mark" aria-hidden="true">✳</span><div><h2 data-zh="你负责想法，他们负责加班。" data-en="You bring the ideas. They bring the overtime.">你负责想法，他们负责加班。</h2><p data-zh="接入本机 Claude Code / Codex。工作细节留在本地，办公室留给你围观。" data-en="Connect your local Claude Code or Codex. Keep the work local. Enjoy the view.">接入本机 Claude Code / Codex。工作细节留在本地，办公室留给你围观。</p></div><a class="cta secondary" href="https://github.com/imelonkid/melon-office#readme" target="_blank" rel="noopener noreferrer"><span data-zh="查看安装说明" data-en="Installation guide">查看安装说明</span> ↗</a></section>
+      </main>
+      <footer class="promo-footer"><span>Melon Office</span><span data-zh="一间小办公室，一点大厂幽默。" data-en="A tiny office. A little corporate humor.">一间小办公室，一点大厂幽默。</span><a href="https://melonkid.cn" target="_blank" rel="noopener noreferrer">Made by melonkid ↗</a><a class="filing" href="https://beian.miit.gov.cn/" target="_blank" rel="noopener noreferrer">京ICP备16017845号-2</a></footer>
+    </div>
+    <script src="assets/hero-v1.js" defer></script>
+  </body>
+</html>

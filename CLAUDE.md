@@ -11,11 +11,12 @@ Claude 在本项目里只做下面「负责」的事；越界的需求先停下�
   - `web/`：网页版工区（Phaser + Vite），`tools/render_assets.py` 生成全部美术
   - `bin/melon-office.mjs`、`install.sh`：命令行版与一行安装
   - `mac/`：原生 macOS 菜单栏 App（SwiftUI / SpriteKit；`server/` 的核心经 `mac/core/` 打包进 JavaScriptCore 运行）
+  - `site/`：独立静态宣传页（HTML / CSS / 图片 / 少量脚本），突出 AI 工区与员工工卡；`scripts/deploy-page.sh` 按项目基线发布页面，`tools/render_promo.swift` 离线生成宣传素材
   - `scripts/`：CI 与（以后的）打包、发布脚本
 - **本项目不负责**：
   - **Claude Code 本身**：只通过公开的 hooks 机制接入，只改 `~/.claude/settings.json`（或项目的 `.claude/settings.local.json`）里带 `X-Melon-Office` 标记 / 指向本机 `/hook/permission` 的那几条，别的配置一律不碰
   - **Codex 本身**：只通过官方 hooks 接入，只增删 `~/.codex/hooks.json`（支持 `CODEX_HOME`）或项目 `.codex/hooks.json` 中带标记的 hooks。配置与信任分开；不自动信任，不修改 `config.toml`、`auth.json` 或信任记录，不读取会话聊天文件
-  - **服务器**：纯本机工具，不部署到服务器，不登记运维注册表。安装包发布到对象存储下载站不算部署
+  - **服务器**：App 和本机桥接不部署到服务器。`site/` 按基线「静态宣传页」独立接入；部署入口、反代、DNS、证书、探活及注册表归 melon-ops，主机坐标不进入本公开仓库
   - **发布流水线本体**（→ `imelonkid/melon-ci`）与**门户登记**（→ 运维仓库 `$OPS_REPO/portal/config.json`）：本仓库只放调用它的表单；要改流水线或门户先和用户确认，在对应仓库改
 - **与其他项目的关系**：依赖 Claude Code 的 hooks 协议、melon-ci 的流水线（`@v2`）；没有项目依赖本仓库
 - **契约**：
@@ -44,6 +45,7 @@ npm run mac            # → mac/build/Melon Office.app
 - 桥接只监听 `127.0.0.1`；hook 载荷里有代码和命令，不写日志、不外发
 - 改代码同步改 `README.md` 与 `README.zh-CN.md`（面向用户）；运维内容写 `docs/MAINTAINING.md`，README 不引用它
 - 发布与回滚一律走 tag，**只在内网门户上点**（GitHub「发布」表单兜底）；版本号：修 bug → patch，新功能 → minor，不兼容 → major。发布方式见 `docs/MAINTAINING.md`
+- 宣传页按基线的静态宣传页例外：`site/` 无构建依赖，`scripts/deploy-page.sh` 从已推送的干净 main 打 `page-v*` 标签后调用部署入口，独立于桌面端版本；不走门户、不起容器。代理不执行发布、不打或推标签，待用户本人发布
 - PR 一律以 `main` 为目标，不开叠加 PR
 - 代码修改并通过验收后，主动提交并 Push，不等用户追问；若需要审批，主动发起审批。Push 后跟进该提交的 CI，失败则修复后再次 Push，直到通过或遇到需要用户决策的问题。不自动合并，不自动发布
 - **PR 合并（或关闭）后这个分支就作废**：后续改动先 `git switch main && git pull`，再开新分支。已经在旧分支上提交了的，把新提交 `git cherry-pick` 到新分支再开 PR
