@@ -109,3 +109,9 @@ Codex 通过官方 hooks.json 发送事件，配置读写和状态机与 Node �
 Actions 的「检查 Hero OSS 权限」（`check-page-oss.yml`）仅 main 手动触发，在现有 production 环境使用 OSS_BUCKET、OSS_ENDPOINT、OSS_ACCESS_KEY_ID、OSS_ACCESS_KEY_SECRET。不导出密钥、不打标签、不连接主机；自检逻辑来自固定版本的 melon-ci，配套 PR 审核合入后才运行。
 
 仅新增 `melon-office/page/_checks/<随机ID>/probe.txt`，验证首次上传 200、匿名读取一致、同内容重试 409 和不同内容覆盖被拒绝。对象保留用于核验，不增加删除权限；没有检查结果前不能把用户已配置等同于权限已验证。运维登记和策略归 melon-ops，原 desktop/* 授权保持不动；页面前缀权限属于新增授权，未通过完整 Hero 部署验收前不切换站点发布方式。
+
+### Hero 门户接入准备（待完整验收后启用）
+
+新增 release-page.yml 表单调用 melon-ci 的独立 page-release；本仓库只提供调用表单，业务应用、Hero 端、部署服务、OSS 前缀与目标节点由运维侧登记，通过原 portal/push.sh 下发。旧应用工作流保持不变，历史项目统一迁移另列运维待办。
+
+OSS 权限已实测通过（Actions 运行 42134026955）。本表单启用前仍须确认 melon-ci v2 包含新增页面工作流和 action、门户原流程已部署 Hero 能力及隔离挂载、内网执行程序/目标入口及受限身份已安装、Hero 登记 PUSH 成功，再进行首次发布与回滚。未验收前保留原 deploy-page.sh 与现有 .melon-baseline 标记，不将代码合并当作迁移完成。
