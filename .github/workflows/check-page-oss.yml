@@ -1,0 +1,31 @@
+# 仅做 OSS 页面前缀权限自检，不打 tag、不发布、不连接主机。
+# 自检逻辑归 melon-ci；固定审核过的源码 commit，不导出或读取 Secret 值。
+name: 检查 Hero OSS 权限
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: page-oss-check
+  cancel-in-progress: false
+jobs:
+  check:
+    name: 上传、匿名读取与禁止覆盖
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: production
+    steps:
+      - name: 获取固定版本的自检程序
+        uses: actions/checkout@v5
+        with:
+          repository: imelonkid/melon-ci
+          ref: 08908668bde4511a3edad1bd0a94e08ae6dfef37
+          path: ci
+          persist-credentials: false
+      - name: 验证页面 OSS 权限
+        env:
+          OSS_BUCKET: ${{ vars.OSS_BUCKET }}
+          OSS_ENDPOINT: ${{ vars.OSS_ENDPOINT }}
+          OSS_ACCESS_KEY_ID: ${{ secrets.OSS_ACCESS_KEY_ID }}
+          OSS_ACCESS_KEY_SECRET: ${{ secrets.OSS_ACCESS_KEY_SECRET }}
+        run: python3 ci/.github/actions/page-artifact/probe.py --project melon-office

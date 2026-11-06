@@ -103,3 +103,9 @@ Codex 通过官方 hooks.json 发送事件，配置读写和状态机与 Node �
 原生停帧现场：关闭/最小化后重开工区，服务和 SwiftUI 工作台仍更新，场景时钟、气泡与人物停止；主线程采样未见阻塞。隔离的菜单栏模式测试已复现「关闭窗口 → 隐藏时接到工作任务 → 重新打开」后旧 SKView 不再出帧，单纯重新绑定场景仍未恢复。`OfficeRenderView` 在窗口可见性恢复、主窗口状态刷新及小窗轮询时检查 `OfficeScene.lastFrameTime`；可见性通知后先留出正常恢复时间，可见且超过两秒无帧才替换 SKView 并绑定原场景。保留原场景、任务、人物、路径及订阅，不重建业务模型或接入服务；同一末帧只恢复一次，避免持续故障下反复重试。原生验收确认同一 OfficeScene 在该关闭/重开流程后继续出帧，人物返回工位；后续验收须包含菜单栏模式、隐藏/恢复、停帧后接到工作任务及人物回座；`scripts/test-mac.sh` 覆盖恢复判定，Mac 上的基线检查会运行它。
 
 宣传页在独立 `site/`，是无构建依赖的 HTML / CSS / 图片 / 预渲染视频 / 少量脚本，不调用工区服务或外部模型。按项目基线 v3「静态宣传页」使用 `scripts/deploy-page.sh`（模板只替换 NAME 为已登记的 `melon-office-page`，PAGE_DIR 为 `site`），采用独立 `page-v*` 标签，经环境变量 `PAGE_DEPLOY_SSH` 调用 TYPE=page 部署入口，由入口从 GitHub 取对应标签的页面并原子切换 current、保留版本以供回滚；不走门户、不起容器、不经 rsync，不添加 Dockerfile 或 /health。腾讯站注册表、部署入口/限定钥匙、反代、域名/证书与 Gatus 由 melon-ops 管理，实际发布状态以运维注册表和部署入口 `status` 为准；未经用户发布指令不打标签、不执行部署。静态页统一门户发布已记入 melon-ops 路线待办，Drip 与本项目后续一起接入。静态资源缓存较长，变更必须换文件名。宣传页下载读取与客户端相同的公开 `latest.json`，OSS 地址验证和 HEAD 探测通过后更新下载按钮，整体五秒超时或验证失败时保留 GitHub Release。OSS 必须允许宣传页来源跨域 GET / HEAD；本次实测清单和 universal DMG 均返回 200，允许 `https://office.melonkid.cn` 来源，无需修改桶权限。`npm run promo:render` 在 macOS 离线生成海报、GIF、无声视频与 site/assets 下的版本化主图、头像和办公室循环视频；大媒体位于忽略的 `promo-output/`。详见 `docs/PROMO.md`。
+
+### Hero OSS 权限自检（不发布）
+
+Actions 的「检查 Hero OSS 权限」（`check-page-oss.yml`）仅 main 手动触发，在现有 production 环境使用 OSS_BUCKET、OSS_ENDPOINT、OSS_ACCESS_KEY_ID、OSS_ACCESS_KEY_SECRET。不导出密钥、不打标签、不连接主机；自检逻辑来自固定版本的 melon-ci，配套 PR 审核合入后才运行。
+
+仅新增 `melon-office/page/_checks/<随机ID>/probe.txt`，验证首次上传 200、匿名读取一致、同内容重试 409 和不同内容覆盖被拒绝。对象保留用于核验，不增加删除权限；没有检查结果前不能把用户已配置等同于权限已验证。运维登记和策略归 melon-ops，原 desktop/* 授权保持不动；页面前缀权限属于新增授权，未通过完整 Hero 部署验收前不切换站点发布方式。
